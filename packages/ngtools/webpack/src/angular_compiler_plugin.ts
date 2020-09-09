@@ -34,7 +34,7 @@ import { ChildProcess, ForkOptions, fork } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
-import { Compiler, compilation } from 'webpack';
+import { Compiler, Compilation, NormalModule } from 'webpack';
 import { time, timeEnd } from './benchmark';
 import { WebpackCompilerHost } from './compiler_host';
 import { DiagnosticMode, gatherDiagnostics, hasErrors, reportDiagnostics } from './diagnostics';
@@ -81,6 +81,7 @@ import {
   NormalModuleFactoryRequest,
 } from './webpack';
 import { createWebpackInputHost } from './webpack-input-host';
+const WebpackError = require('webpack/lib/WebpackError');
 
 export class AngularCompilerPlugin {
   private _options: AngularCompilerPluginOptions;
@@ -629,7 +630,7 @@ export class AngularCompilerPlugin {
     }
   }
 
-  private _checkUnusedFiles(compilation: compilation.Compilation) {
+  private _checkUnusedFiles(compilation: Compilation) {
     // Only do the unused TS files checks when under Ivy
     // since previously we did include unused files in the compilation
     // See: https://github.com/angular/angular-cli/pull/15030
@@ -675,15 +676,15 @@ export class AngularCompilerPlugin {
     };
 
     // Go over all the modules in the webpack compilation and remove them from the sets.
-    compilation.modules.forEach(m => m.resource ? removeSourceFile(m.resource, true) : null);
+    (compilation.modules as Set<NormalModule>).forEach(m => m.resource ? removeSourceFile(m.resource, true) : null);
 
     // Anything that remains is unused, because it wasn't referenced directly or transitively
     // on the files in the compilation.
     for (const fileName of unusedSourceFileNames) {
-      compilation.warnings.push(
+      compilation.warnings.push(new WebpackError(
         `${fileName} is part of the TypeScript compilation but it's unused.\n` +
         `Add only entry points to the 'files' or 'include' properties in your tsconfig.`,
-      );
+      ));
       this._unusedFiles.add(fileName);
       // Remove the truly unused from the type dep list.
       typeDepFileNames.delete(fileName);
@@ -700,7 +701,8 @@ export class AngularCompilerPlugin {
 
   // Registration hook for webpack plugin.
   // tslint:disable-next-line:no-big-function
-  apply(compiler: Compiler & { watchMode?: boolean, parentCompilation?: compilation.Compilation }) {
+  apply(compiler: Compiler): void;
+  apply(compiler: Compiler & { watchMode?: boolean, parentCompilation?: Compilation }) {
     // The below is require by NGCC processor
     // since we need to know which fields we need to process
     compiler.hooks.environment.tap('angular-compiler', () => {
@@ -742,7 +744,7 @@ export class AngularCompilerPlugin {
       };
 
       let host: virtualFs.Host<fs.Stats> = this._options.host || createWebpackInputHost(
-        compilerWithFileSystems.inputFileSystem,
+        compilerWithFileSystems.inputFileSystem as any,
       );
 
       let replacements: Map<Path, Path> | ((path: Path) => Path) | undefined;
@@ -825,10 +827,11 @@ export class AngularCompilerPlugin {
       }
 
       const inputDecorator = new VirtualFileSystemDecorator(
-        compilerWithFileSystems.inputFileSystem,
+        compilerWithFileSystems.inputFileSystem as any,
         this._compilerHost,
       );
       compilerWithFileSystems.inputFileSystem = inputDecorator;
+      // @ts-ignore
       compilerWithFileSystems.watchFileSystem = new VirtualWatchFileSystemDecorator(
         inputDecorator,
         replacements,
@@ -973,7 +976,7 @@ export class AngularCompilerPlugin {
     });
   }
 
-  private async _make(compilation: compilation.Compilation) {
+  private async _make(compilation: Compilation) {
     time('AngularCompilerPlugin._make');
     // tslint:disable-next-line:no-any
     if ((compilation as any)._ngToolsWebpackPluginInstance) {
@@ -1018,9 +1021,9 @@ export class AngularCompilerPlugin {
     timeEnd('AngularCompilerPlugin._make');
   }
 
-  private pushCompilationErrors(compilation: compilation.Compilation) {
-    compilation.errors.push(...this._errors);
-    compilation.warnings.push(...this._warnings);
+  private pushCompilationErrors(compilation: Compilation) {
+    compilation.errors.push(...this._errors.map(e => new WebpackError(e)));
+    compilation.warnings.push(...this._warnings.map(w => new WebpackError(w)));
     this._errors = [];
     this._warnings = [];
   }

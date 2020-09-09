@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import * as webpack from 'webpack';
-
+import {Compilation} from 'webpack';
 const WebpackError = require('webpack/lib/WebpackError');
 const isWebpackFiveOrHigher = (() => {
   if (typeof webpack.version === 'string') {
@@ -19,7 +19,7 @@ const isWebpackFiveOrHigher = (() => {
   return false;
 })();
 
-export function addWarning(compilation: webpack.compilation.Compilation, message: string): void {
+export function addWarning(compilation: Compilation, message: string): void {
   if (isWebpackFiveOrHigher) {
     compilation.warnings.push(new WebpackError(message));
   } else {
@@ -29,7 +29,7 @@ export function addWarning(compilation: webpack.compilation.Compilation, message
   }
 }
 
-export function addError(compilation: webpack.compilation.Compilation, message: string): void {
+export function addError(compilation: Compilation, message: string): void {
   if (isWebpackFiveOrHigher) {
     compilation.errors.push(new WebpackError(message));
   } else {

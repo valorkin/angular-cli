@@ -7,7 +7,8 @@
  */
 
 import * as path from 'path';
-import * as webpack from 'webpack';
+// import * as webpack from 'webpack';
+import {Compiler, RuleSetRule} from 'webpack';
 import {
   AnyComponentStyleBudgetChecker,
   PostcssCliResources,
@@ -26,7 +27,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   const { root, buildOptions } = wco;
   const entryPoints: { [key: string]: [string, ...string[]] } = {};
   const globalStylePaths: string[] = [];
-  const extraPlugins: { apply(compiler: webpack.Compiler): void }[] = [];
+  const extraPlugins: { apply(compiler: Compiler): void }[] = [];
 
   extraPlugins.push(new AnyComponentStyleBudgetChecker(buildOptions.budgets));
 
@@ -35,7 +36,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   // Determine hashing format.
   const hashFormat = getOutputHashFormat(buildOptions.outputHashing as string);
 
-  const postcssPluginCreator = function(loader: webpack.loader.LoaderContext) {
+  const postcssPluginCreator = function(loader: any/*LoaderContext*/) {
     return [
       postcssImports({
         resolve: (url: string) => (url.startsWith('~') ? url.substr(1) : url),
@@ -121,7 +122,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   }
 
   // set base rules to derive final rules from
-  const baseRules: { test: RegExp, use: webpack.RuleSetLoader[] }[] = [
+  const baseRules: { test: RegExp, use: any[]/*RuleSetLoader[]*/ }[] = [
     { test: /\.css$/, use: [] },
     {
       test: /\.scss$|\.sass$/,
@@ -187,7 +188,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   ];
 
   // load component css as raw strings
-  const rules: webpack.RuleSetRule[] = baseRules.map(({ test, use }) => ({
+  const rules: RuleSetRule[] = baseRules.map(({ test, use }) => ({
     exclude: globalStylePaths,
     test,
     use: [

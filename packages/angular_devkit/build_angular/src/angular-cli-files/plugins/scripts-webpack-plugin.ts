@@ -8,7 +8,7 @@
 // tslint:disable
 // TODO: cleanup this file, it's copied as is from Angular CLI.
 
-import { Compiler, loader } from 'webpack';
+import { Compiler } from 'webpack';
 import { CachedSource, ConcatSource, OriginalSource, RawSource, Source } from 'webpack-sources';
 import { interpolateName } from 'loader-utils';
 import * as path from 'path';
@@ -141,7 +141,7 @@ export class ScriptsWebpackPlugin {
 
           const combinedSource = new CachedSource(concatSource);
           const filename = interpolateName(
-            { resourcePath: 'scripts.js' } as loader.LoaderContext,
+            { resourcePath: 'scripts.js' } as any/*loader.LoaderContext*/,
             this.options.filename as string,
             { content: combinedSource.source() },
           );

@@ -123,7 +123,10 @@ export function statsErrorsToString(json: any, statsConfig: any): string {
   }
 
   return rs('\n' + errors
-    .map((error: any) => r(`ERROR in ${error}`))
+    .map((error: any) => {
+      console.error(error);
+      return r(`ERROR in ${error}`);
+    })
     .join('\n\n')
   );
 }

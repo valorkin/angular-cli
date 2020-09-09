@@ -139,7 +139,7 @@ export function serveWebpackBrowser(
     }
 
     const port = await checkPort(options.port || 0, options.host || 'localhost', 4200);
-    const webpackDevServerConfig = (webpackConfig.devServer = buildServerConfig(
+    const webpackDevServerConfig = ((webpackConfig as any).devServer = buildServerConfig(
       root,
       options,
       browserOptions,
@@ -237,13 +237,13 @@ export function serveWebpackBrowser(
       }
 
       return runWebpackDevServer(
-        webpackConfig,
+        webpackConfig as any,
         context,
         {
           logging: loggingFn,
           webpackFactory: require('webpack') as typeof webpack,
           webpackDevServerFactory: require('webpack-dev-server') as typeof WebpackDevServer,
-        },
+        } as any,
       ).pipe(
         map(buildEvent => {
           // Resolve serve address.
@@ -302,7 +302,7 @@ async function setupLocalize(
     if (Array.isArray(webpackConfig.entry['main'])) {
       webpackConfig.entry['main'].unshift(localeDescription.dataPath);
     } else {
-      webpackConfig.entry['main'] = [localeDescription.dataPath, webpackConfig.entry['main']];
+      webpackConfig.entry['main'] = [localeDescription.dataPath, webpackConfig.entry['main'] as string];
     }
   }
 
@@ -588,9 +588,9 @@ function _addLiveReload(
     webpackConfig.entry = {};
   }
   if (!Array.isArray(webpackConfig.entry.main)) {
-    webpackConfig.entry.main = [];
+    webpackConfig.entry.main = [] as any;
   }
-  webpackConfig.entry.main.unshift(...entryPoints);
+  (webpackConfig.entry.main as string[]).unshift(...entryPoints);
 }
 
 /**

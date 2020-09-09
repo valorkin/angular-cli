@@ -56,7 +56,7 @@ export class TypeScriptPathsPlugin {
         }
 
         // Only work on Javascript/TypeScript issuers.
-        if (!request.context.issuer || !request.context.issuer.match(/\.[jt]sx?$/)) {
+        if (!request.context || !request.context.match(/\.[jt]sx?$/)) {
           return;
         }
 

@@ -8,7 +8,7 @@
  */
 
 import { isAbsolute } from 'path';
-import { Compiler, compilation } from 'webpack';
+import {Compiler, Module} from 'webpack';
 import { addWarning } from '../../utils/webpack-diagnostics';
 
 // Webpack doesn't export these so the deep imports can potentially break.
@@ -16,12 +16,13 @@ const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequ
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
 // The below is extended because there are not in the typings
-interface WebpackModule extends compilation.Module {
+// @ts-ignore
+interface WebpackModule extends Module {
   name?: string;
   rawRequest?: string;
   dependencies: WebpackModule[];
-  issuer: WebpackModule | null;
-  module: WebpackModule | null;
+  issuer: WebpackModule;
+  module: WebpackModule;
   userRequest?: string;
   request: string;
 }

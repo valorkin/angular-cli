@@ -9,14 +9,14 @@
 // tslint:disable-next-line:no-global-tslint-disable
 // tslint:disable:no-any
 import * as path from 'path';
-import { loader } from 'webpack';
+// import { loader } from 'webpack';
 import { AngularCompilerPlugin } from './angular_compiler_plugin';
 import { time, timeEnd } from './benchmark';
 
 
 const sourceMappingUrlRe = /^\/\/# sourceMappingURL=[^\r\n]*/gm;
 
-export function ngcLoader(this: loader.LoaderContext) {
+export function ngcLoader(this: any/*loader.LoaderContext*/) {
   const cb = this.async();
   const sourceFileName: string = this.resourcePath;
   const timeLabel = `ngcLoader+${sourceFileName}+`;

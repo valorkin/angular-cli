@@ -46,6 +46,7 @@ export class DedupeModuleResolvePlugin {
 
   apply(compiler: Compiler) {
     compiler.hooks.compilation.tap('DedupeModuleResolvePlugin', (compilation, { normalModuleFactory }) => {
+      // @ts-ignore
       normalModuleFactory.hooks.afterResolve.tap('DedupeModuleResolvePlugin', (result: AfterResolveResult | undefined) => {
         if (!result) {
           return;

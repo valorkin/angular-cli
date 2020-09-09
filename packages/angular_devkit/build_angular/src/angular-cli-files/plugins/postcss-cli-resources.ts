@@ -9,7 +9,6 @@ import { interpolateName } from 'loader-utils';
 import * as path from 'path';
 import * as postcss from 'postcss';
 import * as url from 'url';
-import * as webpack from 'webpack';
 
 function wrapUrl(url: string): string {
   let wrappedUrl;
@@ -30,7 +29,7 @@ export interface PostcssCliResourcesOptions {
   resourcesOutputPath?: string;
   rebaseRootRelative?: boolean;
   filename: string;
-  loader: webpack.loader.LoaderContext;
+  loader: any/*webpack.loader.LoaderContext*/;
   emitFile: boolean;
 }
 
@@ -109,7 +108,7 @@ export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResou
 
     const { pathname, hash, search } = url.parse(inputUrl.replace(/\\/g, '/'));
     const resolver = (file: string, base: string) => new Promise<string>((resolve, reject) => {
-      loader.resolve(base, decodeURI(file), (err, result) => {
+      loader.resolve(base, decodeURI(file), (err: any, result: string | PromiseLike<string> | undefined) => {
         if (err) {
           reject(err);
 
@@ -130,7 +129,7 @@ export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResou
         }
 
         let outputPath = interpolateName(
-          { resourcePath: result } as webpack.loader.LoaderContext,
+          { resourcePath: result } as any/*webpack.loader.LoaderContext*/,
           filename,
           { content },
         );

@@ -231,12 +231,12 @@ export async function execute(
   };
 
   const webpackResult = await runWebpack(
-    (await transforms?.webpackConfiguration?.(config)) || config,
+    ((await transforms?.webpackConfiguration?.(config)) || config) as any,
     context,
     {
       logging,
       webpackFactory: await import('webpack'),
-    },
+    } as any,
   ).toPromise();
 
   // Complete if using VE

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import * as path from 'path';
-import { Compiler, compilation } from 'webpack';
+import { Compiler, Compilation } from 'webpack';
 import { RawSource } from 'webpack-sources';
 import {
   CrossOriginValue,
@@ -30,7 +30,7 @@ export interface IndexHtmlWebpackPluginOptions {
   lang?: string;
 }
 
-function readFile(filename: string, compilation: compilation.Compilation): Promise<string> {
+function readFile(filename: string, compilation: Compilation): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     compilation.inputFileSystem.readFile(filename, (err: Error, data: Buffer) => {
       if (err) {
@@ -113,7 +113,7 @@ export class IndexHtmlWebpackPlugin {
       }
 
       // Add to compilation assets
-      compilation.assets[this._options.output] = new RawSource(indexSource);
+      compilation.assets[this._options.output] = new RawSource(indexSource) as any;
     });
   }
 }

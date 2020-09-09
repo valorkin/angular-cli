@@ -18,7 +18,6 @@ import { VirtualFileSystemDecorator } from '@ngtools/webpack';
 import { dirname, join } from 'path';
 import { OutputAsset, OutputChunk, rollup } from 'rollup';
 import { RawSourceMap } from 'source-map';
-import webpack = require('webpack');
 
 function splitRequest(request: string) {
   const inx = request.lastIndexOf('!');
@@ -37,7 +36,7 @@ function splitRequest(request: string) {
 
 // Load resolve paths using Webpack.
 function webpackResolutionPlugin(
-  loaderContext: webpack.loader.LoaderContext,
+  loaderContext: any/*webpack.loader.LoaderContext*/,
   entryId: string,
   entryIdCodeAndMap: { code: string, map: RawSourceMap },
 ) {
@@ -58,7 +57,7 @@ function webpackResolutionPlugin(
           loaderContext.resolve(
             dirname(importerParts.resource),
             parts.resource,
-            (err, fullPath) => err ? reject(err) : resolve(parts.loaders + fullPath),
+            (err: any, fullPath: string) => err ? reject(err) : resolve(parts.loaders + fullPath),
           );
         });
       }
@@ -73,7 +72,7 @@ function webpackResolutionPlugin(
         // this will apply all relevant loaders, etc.
         loaderContext.loadModule(
           id,
-          (err, source, map) => err ? reject(err) : resolve({ code: source, map: map }),
+          (err: any, source: any, map: any) => err ? reject(err) : resolve({ code: source, map: map }),
         );
       });
     },
@@ -81,7 +80,7 @@ function webpackResolutionPlugin(
 }
 
 export default function webpackRollupLoader(
-  this: webpack.loader.LoaderContext,
+  this: any/*webpack.loader.LoaderContext*/,
   source: string,
   sourceMap: RawSourceMap,
 ) {

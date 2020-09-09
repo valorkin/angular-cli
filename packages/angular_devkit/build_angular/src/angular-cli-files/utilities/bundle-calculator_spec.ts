@@ -33,7 +33,7 @@ describe('bundle-calculator', () => {
             size: 0.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -61,7 +61,7 @@ describe('bundle-calculator', () => {
             size: 0.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -95,7 +95,7 @@ describe('bundle-calculator', () => {
             size: 0.75 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -121,7 +121,7 @@ describe('bundle-calculator', () => {
           },
         ],
         assets: [],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
       const processResults: ProcessBundleResult[] = [
         {
           name: '0',
@@ -164,7 +164,7 @@ describe('bundle-calculator', () => {
           },
         ],
         assets: [],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
       const processResults: ProcessBundleResult[] = [
         {
           name: '0',
@@ -209,7 +209,7 @@ describe('bundle-calculator', () => {
             size: 0.75 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -234,7 +234,7 @@ describe('bundle-calculator', () => {
           },
         ],
         assets: [],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
       const processResults: ProcessBundleResult[] = [
         {
           name: '0',
@@ -277,7 +277,7 @@ describe('bundle-calculator', () => {
           },
         ],
         assets: [],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
       const processResults: ProcessBundleResult[] = [
         {
           name: '0',
@@ -326,7 +326,7 @@ describe('bundle-calculator', () => {
             size: 1.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -359,7 +359,7 @@ describe('bundle-calculator', () => {
             size: 0.75 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -392,7 +392,7 @@ describe('bundle-calculator', () => {
             size: 0.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -421,7 +421,7 @@ describe('bundle-calculator', () => {
             size: 0.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 
@@ -454,7 +454,7 @@ describe('bundle-calculator', () => {
             size: 0.5 * KB,
           },
         ],
-      } as unknown as webpack.Stats.ToJsonOutput;
+      } as unknown;
 
       const failures = Array.from(checkBudgets(budgets, stats, [] /* processResults */));
 

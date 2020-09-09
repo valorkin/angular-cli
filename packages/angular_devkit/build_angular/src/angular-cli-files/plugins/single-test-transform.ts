@@ -8,7 +8,6 @@
 import { logging, tags } from '@angular-devkit/core';
 import { getOptions } from 'loader-utils';
 import { extname, join } from 'path';
-import { loader } from 'webpack';
 
 export interface SingleTestTransformLoaderOptions {
   /* list of paths relative to the entry-point */
@@ -31,7 +30,7 @@ export const SingleTestTransformLoader = require.resolve(join(__dirname, 'single
  * Then it adds import statements for each file in the files options
  * array to import them directly, and thus run the tests there.
  */
-export default function loader(this: loader.LoaderContext, source: string): string {
+export default function loader(this: any/*loader.LoaderContext*/, source: string): string {
   const { files = [], logger = console } = getOptions(this) as SingleTestTransformLoaderOptions;
   // signal the user that expected content is not present.
   if (!source.includes('require.context(')) {

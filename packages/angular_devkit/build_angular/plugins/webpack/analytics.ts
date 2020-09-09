@@ -10,7 +10,7 @@ import {
   Compiler,
   Module,
   Stats,
-  compilation,
+  Compilation
 } from 'webpack';
 import { OriginalSource } from 'webpack-sources';
 
@@ -245,7 +245,7 @@ export class NgBuildAnalyticsPlugin {
    * Reports a succeed module.
    * @private
    */
-  protected _succeedModule(mod: compilation.Module) {
+  protected _succeedModule(mod: Module) {
     // Only report NormalModule instances.
     if (mod.constructor !== NormalModule) {
       return;
@@ -269,7 +269,7 @@ export class NgBuildAnalyticsPlugin {
     }
   }
 
-  protected _compilation(compiler: Compiler, compilation: compilation.Compilation) {
+  protected _compilation(compiler: Compiler, compilation: Compilation) {
     this._reset();
     compilation.hooks.succeedModule.tap('NgBuildAnalyticsPlugin', this._succeedModule.bind(this));
   }

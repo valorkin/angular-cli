@@ -7,7 +7,7 @@
  */
 import * as cssNano from 'cssnano';
 import { ProcessOptions, Result } from 'postcss';
-import { Compiler, compilation } from 'webpack';
+import { Compiler, Compilation, Chunk } from 'webpack';
 import { RawSource, SourceMapSource } from 'webpack-sources';
 import { addWarning } from '../../utils/webpack-diagnostics';
 
@@ -19,8 +19,8 @@ export interface OptimizeCssWebpackPluginOptions {
 function hook(
   compiler: Compiler,
   action: (
-    compilation: compilation.Compilation,
-    chunks: Iterable<compilation.Chunk>,
+    compilation: Compilation,
+    chunks: Iterable<Chunk>,
   ) => Promise<void>,
 ) {
   compiler.hooks.compilation.tap('optimize-css-webpack-plugin', (compilation) => {
@@ -42,7 +42,7 @@ export class OptimizeCssWebpackPlugin {
   }
 
   apply(compiler: Compiler): void {
-    hook(compiler, (compilation: compilation.Compilation, chunks: Iterable<compilation.Chunk>) => {
+    hook(compiler, (compilation: Compilation, chunks: Iterable<Chunk>) => {
       const files: string[] = [...compilation.additionalChunkAssets];
 
       for (const chunk of chunks) {
@@ -122,7 +122,7 @@ export class OptimizeCssWebpackPlugin {
             newSource = new RawSource(output.css);
           }
 
-          compilation.assets[file] = newSource;
+          compilation.assets[file] = newSource as any;
         });
 
       return Promise.all(actions).then(() => {});

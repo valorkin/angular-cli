@@ -6,10 +6,41 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { FileDoesNotExistException, Path, getSystemPath, normalize } from '@angular-devkit/core';
-import { Stats } from 'fs';
-import { InputFileSystem } from 'webpack';
+import {Stats as FsStats, Stats} from 'fs';
+// import { InputFileSystem } from 'webpack';
 import { WebpackCompilerHost } from './compiler_host';
 import { Callback, NodeWatchFileSystemInterface } from './webpack';
+
+interface InputFileSystem {
+  readFile: (
+    arg0: string,
+    arg1: (arg0: NodeJS.ErrnoException, arg1: Buffer) => void
+  ) => void;
+  readJson?: (
+    arg0: string,
+    arg1: (arg0: Error | NodeJS.ErrnoException, arg1?: any) => void
+  ) => void;
+  readlink: (
+    arg0: string,
+    arg1: (arg0: NodeJS.ErrnoException, arg1: string | Buffer) => void
+  ) => void;
+  readdir: (
+    arg0: string,
+    arg1: (arg0: NodeJS.ErrnoException, arg1: string[]) => void
+  ) => void;
+  stat: (
+    arg0: string,
+    arg1: (arg0: NodeJS.ErrnoException, arg1: FsStats) => void
+  ) => void;
+  realpath?: (
+    arg0: string,
+    arg1: (arg0: NodeJS.ErrnoException, arg1: string) => void
+  ) => void;
+  purge?: (arg0: string) => void;
+  join?: (arg0: string, arg1: string) => string;
+  relative?: (arg0: string, arg1: string) => string;
+  dirname?: (arg0: string) => string;
+}
 
 export const NodeWatchFileSystem: NodeWatchFileSystemInterface = require(
   'webpack/lib/node/NodeWatchFileSystem');
@@ -40,9 +71,9 @@ export class VirtualFileSystemDecorator implements InputFileSystem {
     }
   }
 
-  readdir(path: string, callback: Callback<string[]>): void {
+  readdir(path: string, callback: (arg0: NodeJS.ErrnoException, arg1: string[]) => void): void {
     // tslint:disable-next-line:no-any
-    (this._inputFileSystem as any).readdir(path, callback);
+    this._inputFileSystem.readdir(path, callback);
   }
 
   readFile(path: string, callback: (err: Error, contents: Buffer) => void): void {
@@ -55,12 +86,12 @@ export class VirtualFileSystemDecorator implements InputFileSystem {
     }
   }
 
-  readJson(path: string, callback: Callback<{}>): void {
+  readJson(path: string, callback: (arg0: Error | NodeJS.ErrnoException, arg1?: any) => void): void {
     // tslint:disable-next-line:no-any
     (this._inputFileSystem as any).readJson(path, callback);
   }
 
-  readlink(path: string, callback: (err: Error | null | undefined, linkString: string) => void): void {
+  readlink(path: string, callback: (arg0: NodeJS.ErrnoException, arg1: string | Buffer) => void): void {
     this._inputFileSystem.readlink(path, callback);
   }
 
@@ -88,7 +119,7 @@ export class VirtualFileSystemDecorator implements InputFileSystem {
   }
 
   readlinkSync(path: string): string {
-    return this._inputFileSystem.readlinkSync(path);
+    return (this._inputFileSystem as any).readlinkSync(path);
   }
 
   purge(changes?: string[] | string): void {

@@ -9,33 +9,34 @@ import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/ar
 import { getSystemPath, json, normalize, resolve } from '@angular-devkit/core';
 import { Observable, from, isObservable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import * as webpack from 'webpack';
+import {Stats, Configuration, Compiler} from 'webpack';
 import { EmittedFiles, getEmittedFiles } from '../utils';
 import { Schema as RealWebpackBuilderSchema } from './schema';
+import webpack = require('webpack');
 
 export type WebpackBuilderSchema = json.JsonObject & RealWebpackBuilderSchema;
 
 export interface WebpackLoggingCallback {
-  (stats: webpack.Stats, config: webpack.Configuration): void;
+  (stats: Stats, config: Configuration): void;
 }
 export interface WebpackFactory {
-  (config: webpack.Configuration): Observable<webpack.Compiler> | webpack.Compiler;
+  (config: Configuration): Observable<Compiler> | Compiler;
 }
 
 export type BuildResult = BuilderOutput & {
   emittedFiles?: EmittedFiles[];
-  webpackStats?: webpack.Stats.ToJsonOutput;
+  webpackStats?: any;
 };
 
 export function runWebpack(
-  config: webpack.Configuration,
+  config: Configuration,
   context: BuilderContext,
   options: {
     logging?: WebpackLoggingCallback,
     webpackFactory?: WebpackFactory,
   } = {},
 ): Observable<BuildResult> {
-  const createWebpack = (c: webpack.Configuration) => {
+  const createWebpack = (c: Configuration) => {
     if (options.webpackFactory) {
       const result = options.webpackFactory(c);
       if (isObservable(result)) {
@@ -52,11 +53,13 @@ export function runWebpack(
 
   return createWebpack(config).pipe(
     switchMap(webpackCompiler => new Observable<BuildResult>(obs => {
-      const callback = (err: Error | undefined, stats: webpack.Stats) => {
+      const callback = (err: Error | undefined, stats?: Stats) => {
         if (err) {
           return obs.error(err);
         }
-
+        if (!stats) {
+          return;
+        }
         // Log stats.
         log(stats, config);
 
@@ -96,6 +99,6 @@ export default createBuilder<WebpackBuilderSchema>((options, context) => {
   const configPath = resolve(normalize(context.workspaceRoot), normalize(options.webpackConfig));
 
   return from(import(getSystemPath(configPath))).pipe(
-    switchMap((config: webpack.Configuration) => runWebpack(config, context)),
+    switchMap((config: Configuration) => runWebpack(config, context)),
   );
 });

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { RawSourceMap } from 'source-map';
-import * as webpack from 'webpack'; // tslint:disable-line:no-implicit-dependencies
+import {} from 'webpack'; // tslint:disable-line:no-implicit-dependencies
 import { SourceMapSource } from 'webpack-sources';
 const loaderUtils = require('loader-utils');
 
@@ -27,7 +27,7 @@ const alwaysProcess = (path: string) =>
   path.endsWith('.ngstyle.js');
 
 export default function buildOptimizerLoader(
-  this: webpack.loader.LoaderContext,
+  this: any/*LoaderContext*/,
   content: string,
   previousSourceMap: RawSourceMap,
 ) {

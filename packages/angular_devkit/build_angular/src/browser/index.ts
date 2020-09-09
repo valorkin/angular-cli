@@ -278,14 +278,14 @@ export function buildWebpackBrowser(
       const useBundleDownleveling = isDifferentialLoadingNeeded && !options.watch;
       const startTime = Date.now();
 
-      return runWebpack(config, context, {
+      return runWebpack(config as any, context, {
         webpackFactory: require('webpack') as typeof webpack,
         logging:
           transforms.logging ||
           (useBundleDownleveling
             ? () => {}
             : createBrowserLoggingCallback(!!options.verbose, context.logger)),
-      }).pipe(
+      } as any).pipe(
         // tslint:disable-next-line: no-big-function
         concatMap(async buildEvent => {
           const { webpackStats: webpackRawStats, success, emittedFiles = [] } = buildEvent;
@@ -598,7 +598,7 @@ export function buildWebpackBrowser(
               function generateBundleInfoStats(
                 id: string | number,
                 bundle: ProcessBundleFile,
-                chunk: ArrayElement<webpack.Stats.ToJsonOutput['chunks']> | undefined,
+                chunk: any/*ArrayElement<webpack.Stats.ToJsonOutput['chunks']>*/ | undefined,
               ): string {
                 return generateBundleStats(
                   {
@@ -617,7 +617,7 @@ export function buildWebpackBrowser(
               let bundleInfoText = '';
               for (const result of processResults) {
                 const chunk = webpackStats.chunks
-                    && webpackStats.chunks.find((chunk) => chunk.id.toString() === result.name);
+                    && webpackStats.chunks.find((chunk:any) => chunk.id.toString() === result.name);
 
                 if (result.original) {
                   bundleInfoText +=
@@ -631,12 +631,12 @@ export function buildWebpackBrowser(
               }
 
               const unprocessedChunks = webpackStats.chunks && webpackStats.chunks
-                  .filter((chunk) => !processResults
+                  .filter((chunk:any) => !processResults
                       .find((result) => chunk.id.toString() === result.name),
                   ) || [];
               for (const chunk of unprocessedChunks) {
                 const asset =
-                    webpackStats.assets && webpackStats.assets.find(a => a.name === chunk.files[0]);
+                    webpackStats.assets && webpackStats.assets.find((a:any) => a.name === chunk.files[0]);
                 bundleInfoText +=
                   '\n' + generateBundleStats({ ...chunk, size: asset && asset.size }, true);
               }

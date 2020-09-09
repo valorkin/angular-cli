@@ -15,9 +15,9 @@ import { NormalizedEntryPoint } from '../models/webpack-configs';
  * whereever necessary. Does not modify {@param webpackStats}.
  */
 export function markAsyncChunksNonInitial(
-  webpackStats: webpack.Stats.ToJsonOutput,
+  webpackStats: any/*webpack.Stats.ToJsonOutput*/,
   extraEntryPoints: NormalizedEntryPoint[],
-): Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined> {
+): any/*Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>*/ {
   const {chunks = [], entrypoints: entryPoints = {}} = webpackStats;
 
   // Find all Webpack chunk IDs not injected into the main bundle. We don't have
@@ -30,7 +30,7 @@ export function markAsyncChunksNonInitial(
 
   // Find chunks for each ID.
   const asyncChunks = asyncChunkIds.map((chunkId) => {
-      const chunk = chunks.find((chunk) => chunk.id === chunkId);
+      const chunk = chunks.find((chunk:any) => chunk.id === chunkId);
       if (!chunk) {
         throw new Error(`Failed to find chunk (${chunkId}) in set:\n${
             JSON.stringify(chunks)}`);
@@ -44,7 +44,7 @@ export function markAsyncChunksNonInitial(
 
   // A chunk is considered `initial` only if Webpack already belives it to be initial
   // and the application developer did not mark it async via an extra entry point.
-  return chunks.map((chunk) => ({
+  return chunks.map((chunk: { initial: any; }) => ({
     ...chunk,
     initial: chunk.initial && !asyncChunks.find((asyncChunk) => asyncChunk === chunk),
   }));

@@ -16,6 +16,7 @@ import {
   PLATFORM
 } from '@ngtools/webpack';
 import { WebpackConfigOptions, BuildOptions } from '../build-options';
+import {Configuration, WebpackPluginInstance} from 'webpack';
 
 function _pluginOptionsOverrides(
   buildOptions: BuildOptions,
@@ -47,7 +48,7 @@ function _createAotPlugin(
   wco: WebpackConfigOptions,
   options: AngularCompilerPluginOptions,
   i18nExtract = false,
-) {
+): WebpackPluginInstance {
   const { root, buildOptions } = wco;
 
   const i18nInFile = buildOptions.i18nFile
@@ -110,7 +111,7 @@ export function getNonAotConfig(wco: WebpackConfigOptions) {
   };
 }
 
-export function getAotConfig(wco: WebpackConfigOptions, i18nExtract = false) {
+export function getAotConfig(wco: WebpackConfigOptions, i18nExtract = false): Configuration {
   const { tsConfigPath, buildOptions } = wco;
 
   const loaders: any[] = [NgToolsLoader];

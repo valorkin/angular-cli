@@ -54,22 +54,22 @@ export function getServerConfig(wco: WebpackConfigOptions): Configuration {
 }
 
 function externalizePackages(
-  context: string,
-  request: string,
-  callback: (error?: Error, result?: string) => void,
+  data: { context: string, request: string },
+  callback: (error: Error, result: string) => void,
 ): void {
+  const {context, request} = data;
   // Absolute & Relative paths are not externals
   if (request.startsWith('.') || isAbsolute(request)) {
-    callback();
+    callback(undefined as any, undefined as any);
 
     return;
   }
 
   try {
     require.resolve(request, { paths: [context] });
-    callback(undefined, request);
+    callback(undefined as any, request);
   } catch {
     // Node couldn't find it, so it must be user-aliased
-    callback();
+    callback(undefined as any, undefined as any);
   }
 }

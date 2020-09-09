@@ -19,9 +19,8 @@ import {
   Compiler,
   Configuration,
   ContextReplacementPlugin,
-  RuleSetLoader,
   RuleSetRule,
-  compilation,
+  Chunk,
   debug,
 } from 'webpack';
 import { RawSource } from 'webpack-sources';
@@ -147,8 +146,8 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
                 (compilation.mainTemplate.hooks as any).assetPath.tap(
                   'build-angular',
                   (
-                    filename: string | ((data: { chunk: compilation.Chunk }) => string),
-                    data: { chunk: compilation.Chunk },
+                    filename: string | ((data: { chunk: Chunk }) => string),
+                    data: { chunk: Chunk },
                   ) => {
                     const assetName = typeof filename === 'function' ? filename(data) : filename;
                     const isMap = assetName && assetName.endsWith('.map');
@@ -310,7 +309,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
         apply(compiler: Compiler) {
           compiler.hooks.emit.tap('angular-cli-stats', compilation => {
             const data = JSON.stringify(compilation.getStats().toJson('verbose'), undefined, 2);
-            compilation.assets['stats.json'] = new RawSource(data);
+            compilation.assets['stats.json'] = new RawSource(data) as any;
           });
         }
       })(),
@@ -336,9 +335,9 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     });
   }
 
-  let buildOptimizerUseRule: RuleSetLoader[] = [];
+  let buildOptimizerUseRule: any[] = [];
   if (buildOptions.buildOptimizer) {
-    extraPlugins.push(new BuildOptimizerWebpackPlugin());
+    extraPlugins.push(new BuildOptimizerWebpackPlugin() as any);
     buildOptimizerUseRule = [
       {
         loader: buildOptimizerLoaderPath,
@@ -492,7 +491,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     context: projectRoot,
     entry: entryPoints,
     output: {
-      futureEmitAssets: true,
       path: path.resolve(root, buildOptions.outputPath),
       publicPath: buildOptions.deployUrl,
       filename: `[name]${targetInFileName}${hashFormat.chunk}.js`,
@@ -500,7 +498,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     watch: buildOptions.watch,
     watchOptions: {
       poll: buildOptions.poll,
-      ignored: buildOptions.poll === undefined ? undefined : /[\\\/]node_modules[\\\/]/,
+      ignored: buildOptions.poll === undefined ? undefined : ['node_modules/**'],
     },
     performance: {
       hints: false,

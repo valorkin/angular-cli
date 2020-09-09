@@ -5,7 +5,6 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as webpack from 'webpack';
 import { markAsyncChunksNonInitial } from './async-chunks';
 
 describe('async-chunks', () => {
@@ -39,7 +38,7 @@ describe('async-chunks', () => {
           chunks: ['third'],
         },
       };
-      const webpackStats = { chunks, entrypoints } as unknown as webpack.Stats.ToJsonOutput;
+      const webpackStats = { chunks, entrypoints } as unknown;
 
       const extraEntryPoints = [
         {
@@ -77,7 +76,7 @@ describe('async-chunks', () => {
           names: ['third'],
           initial: false, // No longer initial because it was marked async.
         },
-      ] as Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>);
+      ] as any /*Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>*/);
     });
 
     it('ignores runtime dependency of async chunks', () => {
@@ -98,7 +97,7 @@ describe('async-chunks', () => {
           chunks: [0, 1], // Includes runtime as a dependency.
         },
       };
-      const webpackStats = { chunks, entrypoints } as unknown as webpack.Stats.ToJsonOutput;
+      const webpackStats = { chunks, entrypoints } as unknown;
 
       const extraEntryPoints = [
         {
@@ -121,7 +120,7 @@ describe('async-chunks', () => {
           names: ['runtime'],
           initial: true, // Still initial, even though its a dependency.
         },
-      ] as Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>);
+      ] as any/*Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>*/);
     });
   });
 });

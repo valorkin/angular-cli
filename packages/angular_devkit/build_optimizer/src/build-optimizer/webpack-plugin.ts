@@ -9,11 +9,16 @@
 import { Compiler } from 'webpack';  // tslint:disable-line:no-implicit-dependencies
 
 export class BuildOptimizerWebpackPlugin {
-  apply(compiler: Compiler) {
+  apply(compiler: Compiler): void {
     compiler.hooks.normalModuleFactory.tap('BuildOptimizerWebpackPlugin', nmf => {
       nmf.hooks.module.tap('BuildOptimizerWebpackPlugin', (module, data) => {
-        const { descriptionFileData } = data.resourceResolveData;
-        if (descriptionFileData) {
+        const resolveData = data.resourceResolveData;
+        if (resolveData && resolveData.descriptionFileData) {
+          const descriptionFileData = resolveData.descriptionFileData;
+          // fix: this contruct is erroring when resourceResolveData is undefined
+        // const { descriptionFileData } = data.resourceResolveData;
+        // if (descriptionFileData) {
+
           // Only TS packages should use Build Optimizer.
           // Notes:
           // - a TS package might not have defined typings but still use .d.ts files next to their

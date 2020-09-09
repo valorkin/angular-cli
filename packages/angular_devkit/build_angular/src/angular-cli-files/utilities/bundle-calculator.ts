@@ -5,7 +5,6 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as webpack from 'webpack';
 import { ProcessBundleFile, ProcessBundleResult } from '../../../src/utils/process-bundle';
 import { Budget, Type } from '../../browser/schema';
 import { formatSize } from '../utilities/stats';
@@ -104,7 +103,7 @@ export function* calculateThresholds(budget: Budget): IterableIterator<Threshold
  */
 function calculateSizes(
   budget: Budget,
-  stats: webpack.Stats.ToJsonOutput,
+  stats: any,
   processResults: ProcessBundleResult[],
 ): Size[] {
   if (budget.type === Type.AnyComponentStyle) {
@@ -139,8 +138,43 @@ function calculateSizes(
 }
 
 type ArrayElement<T> = T extends Array<infer U> ? U : never;
-type Chunk = ArrayElement<Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>>;
-type Asset = ArrayElement<Exclude<webpack.Stats.ToJsonOutput['assets'], undefined>>;
+// type Chunk = ArrayElement<Exclude<webpack.Stats.ToJsonOutput['chunks'], undefined>>;
+// type Asset = ArrayElement<Exclude<webpack.Stats.ToJsonOutput['assets'], undefined>>;
+type Asset = {
+  chunks: Array<number | string>;
+  chunkNames: string[];
+  emitted: boolean;
+  isOverSizeLimit?: boolean;
+  name: string;
+  size: number;
+};
+type Chunk = {
+  children: number[];
+  childrenByOrder: Record<string, number[]>;
+  entry: boolean;
+  files: string[];
+  filteredModules?: number;
+  hash?: string;
+  id: number | string;
+  initial: boolean;
+  modules?: any;/*FnModules[];*/
+  names: string[];
+  origins?: Array<{
+    moduleId?: string | number;
+    module: string;
+    moduleIdentifier: string;
+    moduleName: string;
+    loc: string;
+    request: string;
+    reasons: string[];
+  }>;
+  parents: number[];
+  reason?: string;
+  recorded?: boolean;
+  rendered: boolean;
+  size: number;
+  siblings: number[];
+};
 abstract class Calculator {
   constructor (
     protected budget: Budget,
@@ -158,7 +192,7 @@ abstract class Calculator {
   ): number {
     // Look for a process result containing different builds for this chunk.
     const processResult = this.processResults
-        .find((processResult) => processResult.name === chunk.id.toString());
+        .find((processResult) => processResult.name === (chunk.id as string).toString());
 
     if (processResult) {
       // Found a differential build, use the correct size information.
@@ -335,7 +369,7 @@ function calculateBytes(
 
 export function* checkBudgets(
   budgets: Budget[],
-  webpackStats: webpack.Stats.ToJsonOutput,
+  webpackStats: any,
   processResults: ProcessBundleResult[],
 ): IterableIterator<{ severity: ThresholdSeverity, message: string }> {
   // Ignore AnyComponentStyle budgets as these are handled in `AnyComponentStyleBudgetChecker`.
