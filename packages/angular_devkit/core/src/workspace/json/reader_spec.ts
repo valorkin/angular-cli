@@ -28,7 +28,7 @@ const basicFile = stripIndent`
   "x-bar": 5,
 }`;
 
-const representativeFile = readFileSync(__dirname + '/test/angular.json', 'utf8');
+const representativeFile = readFileSync(require.resolve(__dirname + '/test/angular.json'), 'utf8');
 
 function createTestHost(content: string, onWrite?: (path: string, data: string) => void) {
   return {
@@ -84,6 +84,13 @@ describe('readJsonWorkpace Parsing', () => {
     expect(workspace.projects.get('my-app')!.targets.get('build')!.builder).toBe(
       '@angular-devkit/build-angular:browser',
     );
+  });
+
+  it(`doesn't remove falsy values when using the spread operator`, async () => {
+    const host = createTestHost(representativeFile);
+    const workspace = await readJsonWorkspace('', host);
+    const prodConfig = workspace.projects.get('my-app')!.targets.get('build')!.configurations!.production!;
+    expect({ ...prodConfig }).toEqual(prodConfig);
   });
 
   it('parses extensions only into extensions object', async () => {

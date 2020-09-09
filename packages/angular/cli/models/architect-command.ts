@@ -26,10 +26,10 @@ export interface ArchitectCommandOptions extends BaseCommandOptions {
 export abstract class ArchitectCommand<
   T extends ArchitectCommandOptions = ArchitectCommandOptions
 > extends Command<T> {
-  protected _architect: Architect;
-  protected _architectHost: WorkspaceNodeModulesArchitectHost;
-  protected _workspace: workspaces.WorkspaceDefinition;
-  protected _registry: json.schema.SchemaRegistry;
+  protected _architect!: Architect;
+  protected _architectHost!: WorkspaceNodeModulesArchitectHost;
+  protected _workspace!: workspaces.WorkspaceDefinition;
+  protected _registry!: json.schema.SchemaRegistry;
 
   // If this command supports running multiple targets.
   protected multiTarget = false;
@@ -42,6 +42,7 @@ export abstract class ArchitectCommand<
 
     this._registry = new json.schema.CoreSchemaRegistry();
     this._registry.addPostTransform(json.schema.transforms.addUndefinedDefaults);
+    this._registry.useXDeprecatedProvider(msg => this.logger.warn(msg));
 
     const { workspace } = await workspaces.readWorkspace(
       this.workspace.root,
@@ -66,8 +67,12 @@ export abstract class ArchitectCommand<
       return;
     }
 
-    const commandLeftovers = options['--'];
     let projectName = options.project;
+    if (projectName && !this._workspace.projects.has(projectName)) {
+      throw new Error(`Project '${projectName}' does not exist.`);
+    }
+
+    const commandLeftovers = options['--'];
     const targetProjectNames: string[] = [];
     for (const [name, project] of this._workspace.projects) {
       if (project.targets.has(this.target)) {
@@ -189,7 +194,7 @@ export abstract class ArchitectCommand<
     return await this.runArchitectTarget(options);
   }
 
-  protected async runBepTarget<T>(
+  protected async runBepTarget(
     command: string,
     configuration: Target,
     overrides: json.JsonObject,

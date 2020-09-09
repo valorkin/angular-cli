@@ -24,6 +24,7 @@ import {
   RepositoryInitializerTask,
 } from '@angular-devkit/schematics/tasks';
 import { Schema as ApplicationOptions } from '../application/schema';
+import { validateProjectName } from '../utility/validation';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as NgNewOptions } from './schema';
 
@@ -32,6 +33,8 @@ export default function(options: NgNewOptions): Rule {
   if (!options.name) {
     throw new SchematicsException(`Invalid options, "name" is required.`);
   }
+
+  validateProjectName(options.name);
 
   if (!options.directory) {
     options.directory = options.name;
@@ -58,7 +61,9 @@ export default function(options: NgNewOptions): Rule {
     skipPackageJson: false,
     // always 'skipInstall' here, so that we do it after the move
     skipInstall: true,
+    strict: options.strict,
     minimal: options.minimal,
+    legacyBrowsers: options.legacyBrowsers,
   };
 
   return chain([

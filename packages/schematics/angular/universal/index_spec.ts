@@ -5,6 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import { JsonParseMode, parseJson } from '@angular-devkit/core';
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { Schema as ApplicationOptions, Style } from '../application/schema';
 import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
@@ -86,12 +87,13 @@ describe('Universal Schematic', () => {
       .toPromise();
     const filePath = '/tsconfig.server.json';
     expect(tree.exists(filePath)).toEqual(true);
-    const contents = tree.readContent(filePath);
-    expect(JSON.parse(contents)).toEqual({
+    // tslint:disable-next-line: no-any
+    const contents = parseJson(tree.readContent(filePath).toString(), JsonParseMode.Loose) as any;
+    expect(contents).toEqual({
       extends: './tsconfig.app.json',
       compilerOptions: {
-        outDir: './out-tsc/app-server',
-        module: 'commonjs',
+        outDir: './out-tsc/server',
+        target: 'es2016',
         types: ['node'],
       },
       files: [
@@ -111,12 +113,13 @@ describe('Universal Schematic', () => {
       .toPromise();
     const filePath = '/projects/bar/tsconfig.server.json';
     expect(tree.exists(filePath)).toEqual(true);
-    const contents = tree.readContent(filePath);
-    expect(JSON.parse(contents)).toEqual({
+    // tslint:disable-next-line: no-any
+    const contents = parseJson(tree.readContent(filePath).toString(), JsonParseMode.Loose) as any;
+    expect(contents).toEqual({
       extends: './tsconfig.app.json',
       compilerOptions: {
-        outDir: '../../out-tsc/app-server',
-        module: 'commonjs',
+        outDir: '../../out-tsc/server',
+        target: 'es2016',
         types: ['node'],
       },
       files: [

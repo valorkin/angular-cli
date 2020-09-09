@@ -6,11 +6,11 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { createConsoleLogger } from '@angular-devkit/core/node';
-import { normalize } from 'path';
 import { format } from 'util';
 import { runCommand } from '../../models/command-runner';
-import { colors, supportsColor } from '../../utilities/color';
+import { colors, removeColor, supportsColor } from '../../utilities/color';
 import { getWorkspaceRaw } from '../../utilities/config';
+import { writeErrorToLogFile } from '../../utilities/log-file';
 import { getWorkspaceDetails } from '../../utilities/project';
 
 const debugEnv = process.env['NG_DEBUG'];
@@ -34,25 +34,22 @@ export default async function(options: { testing?: boolean; cliArgs: string[] })
   }
 
   const logger = createConsoleLogger(isDebug, process.stdout, process.stderr, {
-    info: s => (supportsColor ? s : colors.unstyle(s)),
-    debug: s => (supportsColor ? s : colors.unstyle(s)),
-    warn: s => (supportsColor ? colors.bold.yellow(s) : colors.unstyle(s)),
-    error: s => (supportsColor ? colors.bold.red(s) : colors.unstyle(s)),
-    fatal: s => (supportsColor ? colors.bold.red(s) : colors.unstyle(s)),
+    info: s => (supportsColor ? s : removeColor(s)),
+    debug: s => (supportsColor ? s : removeColor(s)),
+    warn: s => (supportsColor ? colors.bold.yellow(s) : removeColor(s)),
+    error: s => (supportsColor ? colors.bold.red(s) : removeColor(s)),
+    fatal: s => (supportsColor ? colors.bold.red(s) : removeColor(s)),
   });
 
   // Redirect console to logger
-  console.log = function() {
-    logger.info(format.apply(null, arguments));
+  console.info = console.log = function(...args) {
+    logger.info(format(...args));
   };
-  console.info = function() {
-    logger.info(format.apply(null, arguments));
+  console.warn = function(...args) {
+    logger.warn(format(...args));
   };
-  console.warn = function() {
-    logger.warn(format.apply(null, arguments));
-  };
-  console.error = function() {
-    logger.error(format.apply(null, arguments));
+  console.error = function(...args) {
+    logger.error(format(...args));
   };
 
   let projectDetails = getWorkspaceDetails();
@@ -82,12 +79,7 @@ export default async function(options: { testing?: boolean; cliArgs: string[] })
   } catch (err) {
     if (err instanceof Error) {
       try {
-        const fs = await import('fs');
-        const os = await import('os');
-        const tempDirectory = fs.mkdtempSync(fs.realpathSync(os.tmpdir()) + '/' + 'ng-');
-        const logPath = normalize(tempDirectory + '/angular-errors.log');
-        fs.appendFileSync(logPath, '[error] ' + (err.stack || err));
-
+        const logPath = writeErrorToLogFile(err);
         logger.fatal(
           `An unhandled exception occurred: ${err.message}\n` +
             `See "${logPath}" for further details.`,

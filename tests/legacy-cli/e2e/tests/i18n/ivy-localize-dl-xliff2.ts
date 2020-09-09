@@ -1,4 +1,4 @@
-import { appendToFile, expectFileToMatch } from '../../utils/fs';
+import { appendToFile, expectFileToMatch, replaceInFile } from '../../utils/fs';
 import { execAndWaitForOutputToMatch, killAllProcesses, ng } from '../../utils/process';
 import { updateJsonFile } from '../../utils/project';
 import { expectToFail } from '../../utils/utils';
@@ -14,8 +14,17 @@ export default async function() {
 
 export async function executeTest() {
   // Ensure a DL build is used.
+  await replaceInFile(
+    '.browserslistrc',
+    'not IE 11',
+    'IE 11',
+  );
+
   await updateJsonFile('tsconfig.json', config => {
     config.compilerOptions.target = 'es2015';
+    if (!config.angularCompilerOptions) {
+      config.angularCompilerOptions = {};
+    }
     config.angularCompilerOptions.disableTypeScriptVersionCheck = true;
   });
 
@@ -40,6 +49,18 @@ export async function executeTest() {
     // Verify the locale data is registered using the global files
     await expectFileToMatch(`${outputPath}/vendor-es5.js`, '.ng.common.locales');
     await expectFileToMatch(`${outputPath}/vendor-es2015.js`, '.ng.common.locales');
+
+    // Verify the locale data is browser compatible
+    await expectToFail(() => expectFileToMatch(`${outputPath}/vendor-es5.js`, /\bconst\b/));
+    await expectFileToMatch(`${outputPath}/vendor-es2015.js`, /\bconst\b/);
+
+    // Verify locale data comments are removed in production
+    await expectToFail(() =>
+      expectFileToMatch(`${outputPath}/vendor-es5.js`, '// See angular/tools/gulp-tasks/cldr/extract.js'),
+    );
+    await expectToFail(() =>
+      expectFileToMatch(`${outputPath}/vendor-es2015.js`, '// See angular/tools/gulp-tasks/cldr/extract.js'),
+    );
 
     // Execute Application E2E tests with dev server
     await ng('e2e', `--configuration=${lang}`, '--port=0');

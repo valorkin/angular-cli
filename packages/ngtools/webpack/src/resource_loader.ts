@@ -11,10 +11,11 @@
 import * as path from 'path';
 import * as vm from 'vm';
 import { RawSource } from 'webpack-sources';
+import { forwardSlashPath } from './utils';
 
 const NodeTemplatePlugin = require('webpack/lib/node/NodeTemplatePlugin');
 const NodeTargetPlugin = require('webpack/lib/node/NodeTargetPlugin');
-const LoaderTargetPlugin = require('webpack/lib/LoaderTargetPlugin');
+const LibraryTemplatePlugin = require('webpack/lib/LibraryTemplatePlugin');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 
 
@@ -25,9 +26,9 @@ interface CompilationOutput {
 
 export class WebpackResourceLoader {
   private _parentCompilation: any;
-  private _context: string;
-  private _fileDependencies = new Map<string, string[]>();
-  private _reverseDependencies = new Map<string, string[]>();
+  private _context = '';
+  private _fileDependencies = new Map<string, Set<string>>();
+  private _reverseDependencies = new Map<string, Set<string>>();
   private _cachedSources = new Map<string, string>();
   private _cachedEvaluatedSources = new Map<string, RawSource>();
 
@@ -67,7 +68,7 @@ export class WebpackResourceLoader {
     new NodeTemplatePlugin(outputOptions).apply(childCompiler);
     new NodeTargetPlugin().apply(childCompiler);
     new SingleEntryPlugin(this._context, filePath).apply(childCompiler);
-    new LoaderTargetPlugin('node').apply(childCompiler);
+    new LibraryTemplatePlugin('resource', 'var').apply(childCompiler);
 
     childCompiler.hooks.thisCompilation.tap('ngtools-webpack', (compilation: any) => {
       compilation.hooks.additionalAssets.tapAsync('ngtools-webpack',
@@ -129,13 +130,14 @@ export class WebpackResourceLoader {
     });
 
     // Save the dependencies for this resource.
-    this._fileDependencies.set(filePath, childCompilation.fileDependencies);
+    this._fileDependencies.set(filePath, new Set(childCompilation.fileDependencies));
     for (const file of childCompilation.fileDependencies) {
-      const entry = this._reverseDependencies.get(file);
+      const resolvedFile = forwardSlashPath(file);
+      const entry = this._reverseDependencies.get(resolvedFile);
       if (entry) {
-        entry.push(filePath);
+        entry.add(filePath);
       } else {
-        this._reverseDependencies.set(file, [filePath]);
+        this._reverseDependencies.set(resolvedFile, new Set([filePath]));
       }
     }
 
@@ -153,13 +155,13 @@ export class WebpackResourceLoader {
 
   private async _evaluate({ outputName, source }: CompilationOutput): Promise<string> {
       // Evaluate code
-      const evaluatedSource = vm.runInNewContext(source, undefined, { filename: outputName });
-      if (typeof evaluatedSource === 'object' && typeof evaluatedSource.default === 'string') {
-        return evaluatedSource.default;
-      }
+      const context: { resource?: string | { default?: string } } = {};
+      vm.runInNewContext(source, context, { filename: outputName });
 
-      if (typeof evaluatedSource === 'string') {
-        return evaluatedSource;
+      if (typeof context.resource === 'string') {
+        return context.resource;
+      } else if (typeof context.resource?.default === 'string') {
+        return context.resource.default;
       }
 
       throw new Error(`The loader "${outputName}" didn't return a string.`);

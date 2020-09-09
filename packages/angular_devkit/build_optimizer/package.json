@@ -9,10 +9,10 @@
     "build-optimizer": "./src/build-optimizer/cli.js"
   },
   "dependencies": {
-    "loader-utils": "1.2.3",
+    "loader-utils": "2.0.0",
     "source-map": "0.7.3",
-    "tslib": "1.10.0",
-    "typescript": "3.6.4",
-    "webpack-sources": "2.0.0-beta.8"
+    "tslib": "2.0.1",
+    "typescript": "4.0.2",
+    "webpack-sources": "1.4.3"
   }
 }

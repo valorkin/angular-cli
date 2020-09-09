@@ -9,6 +9,13 @@
     "dist/etc/rules",
     "node_modules/tslint-sonarts/lib/rules"
   ],
+  "linterOptions": {
+    "format": "codeFrame",
+    "exclude": [
+      "dist-schema/**",
+      "**/third_party/**"
+    ]
+  },
   "rules": {
     // ==================================================================================================
     // custom rules defined in etc/rules/**
@@ -52,7 +59,13 @@
     "no-string-throw": true,
     "encoding": true,
     "no-floating-promises": true,
-    "no-implicit-dependencies": true,
+    "no-implicit-dependencies": [
+      true,
+      // Specs can depend on the package they are testing.
+      // This is a workaround, we should instead have a dedicated
+      // tslint config only for specs.
+      ["@angular-devkit/build-angular"]
+    ],
     "no-import-side-effect": [true, {"ignore-module": "^(?!rxjs\/)"}],
     "align": [
       true,

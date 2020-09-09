@@ -5,17 +5,19 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as stableStringify from 'fast-json-stable-stringify';
 import { Observable, Subject, concat, of } from 'rxjs';
 import { finalize, ignoreElements, share, shareReplay, tap } from 'rxjs/operators';
 import { JsonValue } from '../../json';
 import {
   JobDescription,
   JobHandler,
-  JobHandlerContext, JobInboundMessage,
+  JobHandlerContext,
+  JobInboundMessage,
   JobOutboundMessage,
   JobOutboundMessageKind,
 } from './api';
+
+import stableStringify = require('fast-json-stable-stringify');
 
 export namespace strategy {
 
@@ -69,7 +71,6 @@ export namespace strategy {
     O extends JsonValue = JsonValue,
   >(replayMessages = false): JobStrategy<A, I, O> {
     let inboundBus = new Subject<JobInboundMessage<I>>();
-    let runContext: JobHandlerContext | null = null;
     let run: Observable<JobOutboundMessage<O>> | null = null;
     let state: JobOutboundMessage<O> | null = null;
 
@@ -106,7 +107,6 @@ export namespace strategy {
           ),
           replayMessages ? shareReplay() : share(),
         );
-        runContext = context;
 
         return run;
       };

@@ -16,9 +16,9 @@ export default async function () {
   }
 
   await replaceInFile(
-    'browserslist',
-    'not IE 9-11',
-    'Safari 9-10.1\nIE 9-11',
+    '.browserslistrc',
+    'not IE 11',
+    'IE 11',
   );
 
   if (!getGlobalVariable('argv')['ve']) {

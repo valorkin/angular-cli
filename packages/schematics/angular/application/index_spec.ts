@@ -6,11 +6,17 @@
  * found in the LICENSE file at https://angular.io/license
  */
 // tslint:disable:no-big-function
+import { JsonParseMode, parseJson } from '@angular-devkit/core';
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { latestVersions } from '../utility/latest-versions';
 import { getFileContent } from '../utility/test';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as ApplicationOptions, Style, ViewEncapsulation } from './schema';
+
+// tslint:disable-next-line: no-any
+function readJsonFile(tree: UnitTestTree, path: string): any {
+  return parseJson(tree.readContent(path).toString(), JsonParseMode.Loose);
+}
 
 describe('Application Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
@@ -133,17 +139,20 @@ describe('Application Schematic', () => {
     expect(content).toContain(`import { enableProdMode, ViewEncapsulation } from '@angular/core'`);
   });
 
-  it('should set the right paths in the tsconfig files', async () => {
+  it('should set the right paths in the tsconfig.app.json', async () => {
     const tree = await schematicRunner.runSchematicAsync('application', defaultOptions, workspaceTree)
       .toPromise();
-    let path = '/projects/foo/tsconfig.app.json';
-    let content = tree.readContent(path);
-    expect(content).toMatch('../../tsconfig.json');
-    path = '/projects/foo/tsconfig.spec.json';
-    content = tree.readContent(path);
-    expect(content).toMatch('../../tsconfig.json');
-    const specTsConfig = JSON.parse(content);
-    expect(specTsConfig.files).toEqual(['src/test.ts', 'src/polyfills.ts']);
+    const { files, extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.app.json');
+    expect(files).toEqual(['src/main.ts', 'src/polyfills.ts']);
+    expect(_extends).toBe('../../tsconfig.json');
+  });
+
+  it('should set the right paths in the tsconfig.spec.json', async () => {
+    const tree = await schematicRunner.runSchematicAsync('application', defaultOptions, workspaceTree)
+      .toPromise();
+    const { files, extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.spec.json');
+    expect(files).toEqual(['src/test.ts', 'src/polyfills.ts']);
+    expect(_extends).toBe('../../tsconfig.json');
   });
 
   it('should set the right path and prefix in the tslint file', async () => {
@@ -182,6 +191,19 @@ describe('Application Schematic', () => {
     expect(architect.test).not.toBeDefined();
     expect(architect.e2e).not.toBeDefined();
     expect(architect.e2e).not.toBeDefined();
+  });
+
+  it('minimal=true should configure the schematics options for components', async () => {
+    const options = { ...defaultOptions, minimal: true };
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const config = JSON.parse(tree.readContent('/angular.json'));
+    const schematics = config.projects.foo.schematics;
+    expect(schematics['@schematics/angular:component']).toEqual({
+      inlineTemplate: true,
+      inlineStyle: true,
+      skipTests: true,
+    });
   });
 
   it('should create correct files when using minimal', async () => {
@@ -267,6 +289,23 @@ describe('Application Schematic', () => {
     });
   });
 
+  it('sideEffects property should be true when strict mode', async () => {
+    const options = { ...defaultOptions, projectRoot: '', strict: true };
+
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = JSON.parse(tree.readContent('/src/app/package.json'));
+    expect(content.sideEffects).toBe(false);
+  });
+
+  it('sideEffects package.json should not exist when not in strict mode', async () => {
+    const options = { ...defaultOptions, projectRoot: '', strict: false };
+
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    expect(tree.exists('/src/app/package.json')).toBeFalse();
+  });
+
   describe('custom projectRoot', () => {
     it('should put app files in the right spot', async () => {
       const options = { ...defaultOptions, projectRoot: '' };
@@ -339,9 +378,9 @@ describe('Application Schematic', () => {
       const options = { ...defaultOptions, projectRoot: '' };
       const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
         .toPromise();
-      const appTsConfig = JSON.parse(tree.readContent('/tsconfig.app.json'));
+      const appTsConfig = readJsonFile(tree, '/tsconfig.app.json');
       expect(appTsConfig.extends).toEqual('./tsconfig.json');
-      const specTsConfig = JSON.parse(tree.readContent('/tsconfig.spec.json'));
+      const specTsConfig = readJsonFile(tree, '/tsconfig.spec.json');
       expect(specTsConfig.extends).toEqual('./tsconfig.json');
       expect(specTsConfig.files).toEqual(['src/test.ts', 'src/polyfills.ts']);
     });
@@ -365,7 +404,10 @@ describe('Application Schematic', () => {
       const content = JSON.parse(tree.readContent('/tslint.json'));
       expect(content.extends).toMatch('tslint:recommended');
       expect(content.rules['component-selector'][2]).toMatch('app');
-      expect(content.rules['trailing-comma']).toBeDefined();
+      expect(content.rules['no-console']).toBeDefined();
+      // codelyzer rules should be after base tslint rules
+      expect(Object.keys(content.rules).indexOf('component-selector'))
+        .toBeGreaterThan(Object.keys(content.rules).indexOf('no-console'));
     });
 
     it(`should create correct paths when 'newProjectRoot' is blank`, async () => {
@@ -382,10 +424,31 @@ describe('Application Schematic', () => {
       expect(buildOpt.polyfills).toEqual('foo/src/polyfills.ts');
       expect(buildOpt.tsConfig).toEqual('foo/tsconfig.app.json');
 
-      const appTsConfig = JSON.parse(tree.readContent('/foo/tsconfig.app.json'));
+      const appTsConfig = readJsonFile(tree, '/foo/tsconfig.app.json');
       expect(appTsConfig.extends).toEqual('../tsconfig.json');
-      const specTsConfig = JSON.parse(tree.readContent('/foo/tsconfig.spec.json'));
+      const specTsConfig = readJsonFile(tree, '/foo/tsconfig.spec.json');
       expect(specTsConfig.extends).toEqual('../tsconfig.json');
     });
+  });
+
+  it(`should add support for IE 9-11 in '.browserslistrc' when 'legacyBrowsers' is true`, async () => {
+    const options: ApplicationOptions = { ...defaultOptions, legacyBrowsers: true };
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = tree.readContent('/projects/foo/.browserslistrc');
+    expect(content).not.toContain('not IE 11');
+    expect(content).toContain('IE 11');
+
+    expect(content).not.toContain('not IE 9-10');
+    expect(content).toContain('IE 9-10');
+  });
+
+  it(`should not add support for IE 9-11 in '.browserslistrc' when 'legacyBrowsers' is false`, async () => {
+    const options: ApplicationOptions = { ...defaultOptions, legacyBrowsers: false };
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = tree.readContent('/projects/foo/.browserslistrc');
+    expect(content).toContain('not IE 11');
+    expect(content).toContain('not IE 9-10');
   });
 });

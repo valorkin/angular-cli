@@ -11,7 +11,6 @@ import * as webpack from 'webpack';
 import {
   AnyComponentStyleBudgetChecker,
   PostcssCliResources,
-  RawCssLoader,
   RemoveHashPlugin,
   SuppressExtractedTextChunksWebpackPlugin,
 } from '../../plugins/webpack';
@@ -25,11 +24,11 @@ const postcssImports = require('postcss-import');
 // tslint:disable-next-line:no-big-function
 export function getStylesConfig(wco: WebpackConfigOptions) {
   const { root, buildOptions } = wco;
-  const entryPoints: { [key: string]: string[] } = {};
+  const entryPoints: { [key: string]: [string, ...string[]] } = {};
   const globalStylePaths: string[] = [];
-  const extraPlugins: webpack.Plugin[] = [
-    new AnyComponentStyleBudgetChecker(buildOptions.budgets),
-  ];
+  const extraPlugins: { apply(compiler: webpack.Compiler): void }[] = [];
+
+  extraPlugins.push(new AnyComponentStyleBudgetChecker(buildOptions.budgets));
 
   const cssSourceMap = buildOptions.sourceMap.styles;
 
@@ -122,20 +121,31 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   }
 
   // set base rules to derive final rules from
-  const baseRules: webpack.RuleSetRule[] = [
+  const baseRules: { test: RegExp, use: webpack.RuleSetLoader[] }[] = [
     { test: /\.css$/, use: [] },
     {
       test: /\.scss$|\.sass$/,
       use: [
         {
+          loader: require.resolve('resolve-url-loader'),
+          options: {
+            sourceMap: cssSourceMap,
+          },
+        },
+        {
           loader: require.resolve('sass-loader'),
           options: {
             implementation: sassImplementation,
-            sourceMap: cssSourceMap,
+            sourceMap: true,
             sassOptions: {
               // bootstrap-sass requires a minimum precision of 8
               precision: 8,
               includePaths,
+              // Use expanded as otherwise sass will remove comments that are needed for autoprefixer
+              // Ex: /* autoprefixer grid: autoplace */
+              // tslint:disable-next-line: max-line-length
+              // See: https://github.com/webpack-contrib/sass-loader/blob/45ad0be17264ceada5f0b4fb87e9357abe85c4ff/src/getSassOptions.js#L68-L70
+              outputStyle: 'expanded',
             },
           },
         },
@@ -148,8 +158,10 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
           loader: require.resolve('less-loader'),
           options: {
             sourceMap: cssSourceMap,
-            javascriptEnabled: true,
-            ...lessPathOptions,
+            lessOptions: {
+              javascriptEnabled: true,
+              ...lessPathOptions,
+            },
           },
         },
       ],
@@ -158,9 +170,15 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
       test: /\.styl$/,
       use: [
         {
-          loader: require.resolve('stylus-loader'),
+          loader: require.resolve('resolve-url-loader'),
           options: {
             sourceMap: cssSourceMap,
+          },
+        },
+        {
+          loader: require.resolve('stylus-loader'),
+          options: {
+            sourceMap: { comment: false },
             paths: includePaths,
           },
         },
@@ -188,7 +206,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
             && !buildOptions.sourceMap.hidden ? 'inline' : false,
         },
       },
-      ...(use as webpack.Loader[]),
+      ...use,
     ],
   }));
 
@@ -200,8 +218,21 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
           include: globalStylePaths,
           test,
           use: [
-            buildOptions.extractCss ? MiniCssExtractPlugin.loader : require.resolve('style-loader'),
-            RawCssLoader,
+            buildOptions.extractCss
+              ? {
+                loader: MiniCssExtractPlugin.loader,
+                options: {
+                  hmr: buildOptions.hmr,
+                },
+              }
+              : require.resolve('style-loader'),
+            {
+              loader: require.resolve('css-loader'),
+              options: {
+                url: false,
+                sourceMap: cssSourceMap,
+              },
+            },
             {
               loader: require.resolve('postcss-loader'),
               options: {
@@ -213,7 +244,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
                     : cssSourceMap,
               },
             },
-            ...(use as webpack.Loader[]),
+            ...use,
           ],
         };
       }),

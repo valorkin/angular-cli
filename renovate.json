@@ -2,11 +2,12 @@
   "pinVersions": false,
   "semanticCommits": true,
   "semanticPrefix": "build",
-  "commitMessage": "{{semanticPrefix}} update {{depName}} to version {{newVersion}}",
+  "commitMessage": "{{semanticPrefix}} update {{#if groupName}}{{{groupName}}} packages{{else}}{{{depName}}} to version {{{newVersion}}}{{/if}}",
   "separateMajorMinor": false,
   "prHourlyLimit": 2,
   "labels": [
-    "PR target: master-only"
+    "PR target: master-only",
+    "PR action: merge"
   ],
   "timezone": "America/Tijuana",
   "lockFileMaintenance": {
@@ -29,11 +30,6 @@
     "packages/**/package.json",
     "tests/legacy-cli/e2e/ng-snapshot/package.json"
   ],
-  "major": {
-    "devDependencies": {
-      "enabled": false
-    }
-  },
   "packageRules": [
     {
       "packagePatterns": [
@@ -53,7 +49,7 @@
       "packagePatterns": [
         "^@bazel\/.*",
         "^build_bazel.*",
-        "^bazel_toolchains$"
+        "bazel_toolchains"
       ],
       "groupName": "bazel",
       "pinVersions": false

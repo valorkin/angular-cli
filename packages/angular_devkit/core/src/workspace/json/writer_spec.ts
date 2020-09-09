@@ -30,7 +30,7 @@ const basicFile = stripIndent`
   "x-bar": 5,
 }`;
 
-const representativeFile = readFileSync(__dirname + '/test/angular.json', 'utf8');
+const representativeFile = readFileSync(require.resolve(__dirname + '/test/angular.json'), 'utf8');
 
 function createTestCaseHost(inputData = '') {
   const host = {
@@ -39,7 +39,8 @@ function createTestCaseHost(inputData = '') {
     },
     async writeFile(path: string, data: string) {
       try {
-        const testCase = readFileSync(join(__dirname, 'test', 'cases', path) + '.json', 'utf8');
+        const testCase = readFileSync(
+          require.resolve(join(__dirname, 'test', 'cases', path) + '.json'), 'utf8');
         expect(data).toEqual(testCase);
       } catch (e) {
         fail(`Unable to load test case '${path}': ${e.message || e}`);
@@ -590,5 +591,36 @@ describe('writeJsonWorkpaceFile', () => {
     workspace.extensions['x-foo'] = null;
 
     await writeJsonWorkspace(workspace, host, 'ObjectReplace3');
+  });
+
+  it('removes a property when property value is set to undefined', async () => {
+    const host = createTestCaseHost(basicFile);
+
+    const workspace = await readJsonWorkspace('', host);
+
+    workspace.extensions['x-baz'] = undefined;
+
+    await writeJsonWorkspace(workspace, host, 'ObjectRemove');
+  });
+
+  it('removes a property when using delete operator', async () => {
+    const host = createTestCaseHost(basicFile);
+
+    const workspace = await readJsonWorkspace('', host);
+
+    delete workspace.extensions['x-baz'];
+
+    await writeJsonWorkspace(workspace, host, 'ObjectRemove');
+  });
+
+  it('removes multiple properties when using delete operator', async () => {
+    const host = createTestCaseHost(basicFile);
+
+    const workspace = await readJsonWorkspace('', host);
+
+    delete workspace.extensions['x-baz'];
+    delete workspace.extensions.schematics;
+
+    await writeJsonWorkspace(workspace, host, 'ObjectRemoveMultiple');
   });
 });

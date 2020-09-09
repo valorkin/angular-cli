@@ -12,7 +12,6 @@ import {
   JsonObject,
   JsonParseMode,
   JsonValue,
-  experimental,
   parseJson,
   tags,
 } from '@angular-devkit/core';
@@ -21,7 +20,6 @@ import { v4 as uuidV4 } from 'uuid';
 import { Command } from '../models/command';
 import { Arguments, CommandScope } from '../models/interface';
 import {
-  getWorkspace,
   getWorkspaceRaw,
   migrateLegacyGlobalConfig,
   validateWorkspace,
@@ -36,13 +34,6 @@ function _validateBoolean(value: string) {
   } else {
     throw new Error(`Invalid value type; expected Boolean, received ${JSON.stringify(value)}.`);
   }
-}
-function _validateNumber(value: string) {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue)) {
-    return numberValue;
-  }
-  throw new Error(`Invalid value type; expected Number, received ${JSON.stringify(value)}.`);
 }
 function _validateString(value: string) {
   return value;
@@ -122,7 +113,7 @@ function getValueFromPath<T extends JsonArray | JsonObject>(
   const fragments = parseJsonPath(path);
 
   try {
-    return fragments.reduce((value: JsonValue, current: string | number) => {
+    return fragments.reduce((value: JsonValue | undefined, current: string | number) => {
       if (value == undefined || typeof value != 'object') {
         return undefined;
       } else if (typeof current == 'string' && !Array.isArray(value)) {
@@ -146,7 +137,7 @@ function setValueFromPath<T extends JsonArray | JsonObject>(
   const fragments = parseJsonPath(path);
 
   try {
-    return fragments.reduce((value: JsonValue, current: string | number, index: number) => {
+    return fragments.reduce((value: JsonValue | undefined, current: string | number, index: number) => {
       if (value == undefined || typeof value != 'object') {
         return undefined;
       } else if (typeof current == 'string' && !Array.isArray(value)) {
@@ -211,12 +202,12 @@ export class ConfigCommand extends Command<ConfigCommandSchema> {
       await this.validateScope(CommandScope.InProject);
     }
 
-    let config = await getWorkspace(level);
+    let [config] = getWorkspaceRaw(level);
 
     if (options.global && !config) {
       try {
         if (migrateLegacyGlobalConfig()) {
-          config = await getWorkspace(level);
+          config = getWorkspaceRaw(level)[0];
           this.logger.info(tags.oneLine`
             We found a global configuration that was used in Angular CLI 1.
             It has been automatically migrated.`);
@@ -231,28 +222,16 @@ export class ConfigCommand extends Command<ConfigCommandSchema> {
         return 1;
       }
 
-      const workspace = ((config as {}) as { _workspace: experimental.workspace.WorkspaceSchema })
-        ._workspace;
-
-      return this.get(workspace, options);
+      return this.get(config.value, options);
     } else {
       return this.set(options);
     }
   }
 
-  private get(config: experimental.workspace.WorkspaceSchema, options: ConfigCommandSchema) {
+  private get(config: JsonObject, options: ConfigCommandSchema) {
     let value;
     if (options.jsonPath) {
-      if (options.jsonPath === 'cli.warnings.typescriptMismatch') {
-        // NOTE: Remove this in 9.0.
-        this.logger.warn('The "typescriptMismatch" warning has been removed in 8.0.');
-        // Since there is no actual warning, this value is always false.
-        this.logger.info('false');
-
-        return 0;
-      }
-
-      value = getValueFromPath((config as {}) as JsonObject, options.jsonPath);
+      value = getValueFromPath(config, options.jsonPath);
     } else {
       value = config;
     }
@@ -273,13 +252,6 @@ export class ConfigCommand extends Command<ConfigCommandSchema> {
   private async set(options: ConfigCommandSchema) {
     if (!options.jsonPath || !options.jsonPath.trim()) {
       throw new Error('Invalid Path.');
-    }
-
-    if (options.jsonPath === 'cli.warnings.typescriptMismatch') {
-      // NOTE: Remove this in 9.0.
-      this.logger.warn('The "typescriptMismatch" warning has been removed in 8.0.');
-
-      return 0;
     }
 
     if (

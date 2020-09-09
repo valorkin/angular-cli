@@ -6,8 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { existsSync } from 'fs';
-import * as path from 'path';
 import { Observable, of, throwError } from 'rxjs';
 import { concatMap, first, map, tap } from 'rxjs/operators';
 import { BaseException } from '../../exception';
@@ -92,8 +90,8 @@ export class Workspace {
   ];
 
   private readonly _workspaceSchemaPath = normalize(require.resolve('./workspace-schema.json'));
-  private _workspaceSchema: JsonObject;
-  private _workspace: WorkspaceSchema;
+  private _workspaceSchema?: JsonObject;
+  private _workspace!: WorkspaceSchema;
   private _registry: schema.CoreSchemaRegistry;
 
   constructor(
@@ -131,7 +129,7 @@ export class Workspace {
 
   loadWorkspaceFromJson(json: {}) {
     return this._loadWorkspaceSchema().pipe(
-      concatMap((workspaceSchema) => this.validateAgainstSchema(json, workspaceSchema)),
+      concatMap((workspaceSchema) => this.validateAgainstSchema<WorkspaceSchema>(json, workspaceSchema)),
       tap((validatedWorkspace: WorkspaceSchema) => this._workspace = validatedWorkspace),
       map(() => this),
     );

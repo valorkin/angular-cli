@@ -5,7 +5,8 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-// tslint:disable-next-line:no-implicit-dependencies
+// tslint:disable-next-line: no-global-tslint-disable
+// tslint:disable: no-implicit-dependencies
 import { JsonObject } from '@angular-devkit/core';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
@@ -13,7 +14,7 @@ import * as path from 'path';
 import * as ts from 'typescript';
 
 const distRoot = path.join(__dirname, '../dist');
-const { versions: monorepoVersions, packages: monorepoPackages } = require('../.monorepo.json');
+const { packages: monorepoPackages } = require('../.monorepo.json');
 
 
 export interface PackageInfo {
@@ -84,7 +85,6 @@ function loadPackageJson(p: string) {
         pkg['engines'] = {
           'node': '>= 10.13.0',
           'npm': '>= 6.11.0',
-          'pnpm': '>= 3.2.0',
           'yarn': '>= 1.13.0',
         };
         break;
@@ -164,20 +164,28 @@ function _getVersionFromGit(experimental: boolean): string {
   }
 
   const hasLocalChanges = _exec(`git status --porcelain`) != '';
-  const scmVersionTagRaw = _exec(`git describe --match v[0-9].[0-9].[0-9]* --abbrev=7 --tags`)
+  const scmVersionTagRaw = _exec(`git describe --match v[0-9]*.[0-9]*.[0-9]* --abbrev=7 --tags`)
     .slice(1);
   stableVersion = scmVersionTagRaw.replace(/-([0-9]+)-g/, '+$1.');
   if (hasLocalChanges) {
     stableVersion += stableVersion.includes('+') ? '.with-local-changes' : '+with-local-changes';
   }
 
-  experimentalVersion = `0.${stableVersion.replace(/^(\d+)\.(\d+)/, (_, major, minor) => {
-    return '' + (parseInt(major, 10) * 100 + parseInt(minor, 10));
-  })}`;
+  experimentalVersion = stableToExperimentalVersion(stableVersion);
 
   return experimental ? experimentalVersion : stableVersion;
 }
 
+/**
+ * Convert a stable version to its experimental equivalent. For example,
+ *   stable = 10.2.3, experimental = 0.1002.3
+ * @param stable Must begin with d+.d+ where d is a 0-9 digit.
+ */
+export function stableToExperimentalVersion(stable: string): string {
+  return `0.${stable.replace(/^(\d+)\.(\d+)/, (_, major, minor) => {
+    return '' + (parseInt(major, 10) * 100 + parseInt(minor, 10));
+  })}`;
+}
 
 // All the supported packages. Go through the packages directory and create a map of
 // name => PackageInfo. This map is partial as it lacks some information that requires the

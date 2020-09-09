@@ -11,11 +11,10 @@ import { Compiler } from 'webpack';  // tslint:disable-line:no-implicit-dependen
 export class BuildOptimizerWebpackPlugin {
   apply(compiler: Compiler) {
     compiler.hooks.normalModuleFactory.tap('BuildOptimizerWebpackPlugin', nmf => {
-      nmf.hooks.module.tap('BuildOptimizerWebpackPlugin', (module: any, data: any) => {
-        const resolveData = data.resourceResolveData;
-        if (resolveData && resolveData.descriptionFileData) {
+      nmf.hooks.module.tap('BuildOptimizerWebpackPlugin', (module, data) => {
+        const { descriptionFileData } = data.resourceResolveData;
+        if (descriptionFileData) {
           // Only TS packages should use Build Optimizer.
-          const typings = resolveData.descriptionFileData.typings;
           // Notes:
           // - a TS package might not have defined typings but still use .d.ts files next to their
           // .js files. We don't cover that case because the Angular Package Format (APF) calls for
@@ -23,7 +22,8 @@ export class BuildOptimizerWebpackPlugin {
           // provide configuration options to the plugin to cover that case if there's demand.
           // - a JS-only package that also happens to provides typings will also be flagged by this
           // check. Not sure there's a good way to skip those.
-          module.factoryMeta.skipBuildOptimizer = !typings;
+          const skipBuildOptimizer = !descriptionFileData.typings;
+          module.factoryMeta = { ...module.factoryMeta, skipBuildOptimizer };
         }
 
         return module;

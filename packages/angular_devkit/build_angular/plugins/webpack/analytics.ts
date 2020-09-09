@@ -12,12 +12,12 @@ import {
   Stats,
   compilation,
 } from 'webpack';
-import { Source } from 'webpack-sources';
+import { OriginalSource } from 'webpack-sources';
 
 const NormalModule = require('webpack/lib/NormalModule');
 
 interface NormalModule extends Module {
-  _source?: Source | null;
+  _source?: OriginalSource | null;
   resource?: string;
 }
 
@@ -122,7 +122,7 @@ export class NgBuildAnalyticsPlugin {
 
     return metrics;
   }
-  protected _getDimensions(stats: Stats) {
+  protected _getDimensions() {
     const dimensions: (string | number | boolean)[] = [];
 
     if (this._stats.errors.length) {
@@ -136,13 +136,13 @@ export class NgBuildAnalyticsPlugin {
   }
 
   protected _reportBuildMetrics(stats: Stats) {
-    const dimensions = this._getDimensions(stats);
+    const dimensions = this._getDimensions();
     const metrics = this._getMetrics(stats);
     this._analytics.event(this._category, 'build', { dimensions, metrics });
   }
 
   protected _reportRebuildMetrics(stats: Stats) {
-    const dimensions = this._getDimensions(stats);
+    const dimensions = this._getDimensions();
     const metrics = this._getMetrics(stats);
     this._analytics.event(this._category, 'rebuild', { dimensions, metrics });
   }
@@ -161,6 +161,8 @@ export class NgBuildAnalyticsPlugin {
       this._stats.numberOfComponents += countOccurrences(module._source.source(), 'Component({');
       // For Ivy we just count ɵcmp.
       this._stats.numberOfComponents += countOccurrences(module._source.source(), '.ɵcmp', true);
+      // for ascii_only true
+      this._stats.numberOfComponents += countOccurrences(module._source.source(), '.\u0275cmp', true);
     }
   }
 
@@ -172,6 +174,8 @@ export class NgBuildAnalyticsPlugin {
       // Count the number of `.ɵccf(` strings (case sensitive). They're calls to components
       // factories.
       this._stats.numberOfComponents += countOccurrences(module._source.source(), '.ɵccf(');
+      // for ascii_only true
+      this._stats.numberOfComponents += countOccurrences(module._source.source(), '.\u0275ccf(');
     }
   }
 
@@ -241,7 +245,7 @@ export class NgBuildAnalyticsPlugin {
    * Reports a succeed module.
    * @private
    */
-  protected _succeedModule(mod: Module) {
+  protected _succeedModule(mod: compilation.Module) {
     // Only report NormalModule instances.
     if (mod.constructor !== NormalModule) {
       return;

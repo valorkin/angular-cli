@@ -6,12 +6,11 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {
-  CompilerHost, Diagnostic, Diagnostics,
+  Diagnostic, Diagnostics,
   Program, formatDiagnostics, isNgDiagnostic,
 } from '@angular/compiler-cli';
 import * as ts from 'typescript';
 import { time, timeEnd } from './benchmark';
-import { WebpackCompilerHost } from './compiler_host';
 
 export enum DiagnosticMode {
   Syntactic = 1 << 0,
@@ -109,7 +108,6 @@ export function gatherDiagnostics(
 
 export function reportDiagnostics(
   diagnostics: Diagnostics,
-  compilerHost: WebpackCompilerHost & CompilerHost,
   reportError: (msg: string) => void,
   reportWarning: (msg: string) => void,
 ) {
@@ -141,12 +139,12 @@ export function reportDiagnostics(
   }
 
   if (tsErrors.length > 0) {
-    const message = ts.formatDiagnosticsWithColorAndContext(tsErrors, compilerHost);
+    const message = formatDiagnostics(tsErrors);
     reportError(message);
   }
 
   if (tsWarnings.length > 0) {
-    const message = ts.formatDiagnosticsWithColorAndContext(tsWarnings, compilerHost);
+    const message = formatDiagnostics(tsWarnings);
     reportWarning(message);
   }
 

@@ -7,19 +7,69 @@
  */
 import * as path from 'path';
 
-const mangleVariable = process.env['NG_BUILD_MANGLE'];
-export const manglingDisabled =
-  !!mangleVariable && (mangleVariable === '0' || mangleVariable.toLowerCase() === 'false');
+function isDisabled(variable: string): boolean {
+  return variable === '0' || variable.toLowerCase() === 'false';
+}
 
+function isEnabled(variable: string): boolean {
+  return variable === '1' || variable.toLowerCase() === 'true';
+}
+
+function isPresent(variable: string | undefined): variable is string {
+  return typeof variable === 'string' && variable !== '';
+}
+
+// Optimization and mangling
+const debugOptimizeVariable = process.env['NG_BUILD_DEBUG_OPTIMIZE'];
+const debugOptimize = (() => {
+  if (!isPresent(debugOptimizeVariable) || isDisabled(debugOptimizeVariable)) {
+    return {
+      mangle: true,
+      minify: true,
+      beautify: false,
+    };
+  }
+
+  const debugValue = {
+    mangle: false,
+    minify: false,
+    beautify: true,
+  };
+
+  if (isEnabled(debugOptimizeVariable)) {
+    return debugValue;
+  }
+
+  for (const part of debugOptimizeVariable.split(',')) {
+    switch (part.trim().toLowerCase()) {
+      case 'mangle':
+        debugValue.mangle = true;
+        break;
+      case 'minify':
+        debugValue.minify = true;
+        break;
+      case 'beautify':
+        debugValue.beautify = true;
+        break;
+    }
+  }
+
+  return debugValue;
+})();
+
+const mangleVariable = process.env['NG_BUILD_MANGLE'];
+export const allowMangle = isPresent(mangleVariable)
+  ? !isDisabled(mangleVariable)
+  : debugOptimize.mangle;
+
+export const shouldBeautify = debugOptimize.beautify;
+export const allowMinify = debugOptimize.minify;
+
+// Build cache
 const cacheVariable = process.env['NG_BUILD_CACHE'];
-export const cachingDisabled =
-  !!cacheVariable && (cacheVariable === '0' || cacheVariable.toLowerCase() === 'false');
+export const cachingDisabled = isPresent(cacheVariable) && isDisabled(cacheVariable);
 export const cachingBasePath = (() => {
-  if (
-    cachingDisabled ||
-    !cacheVariable ||
-    (cacheVariable === '1' || cacheVariable.toLowerCase() === 'true')
-  ) {
+  if (cachingDisabled || !isPresent(cacheVariable) || isEnabled(cacheVariable)) {
     return null;
   }
   if (!path.isAbsolute(cacheVariable)) {
@@ -28,3 +78,7 @@ export const cachingBasePath = (() => {
 
   return cacheVariable;
 })();
+
+// Build profiling
+const profilingVariable = process.env['NG_BUILD_PROFILING'];
+export const profilingEnabled = isPresent(profilingVariable) && isEnabled(profilingVariable);

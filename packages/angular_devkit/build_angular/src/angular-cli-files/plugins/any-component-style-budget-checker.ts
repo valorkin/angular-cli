@@ -6,8 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { Compiler, Plugin } from 'webpack';
+import * as path from 'path';
+import { Compiler } from 'webpack';
 import { Budget, Type } from '../../../src/browser/schema';
+import { addError, addWarning } from '../../utils/webpack-diagnostics';
 import { ThresholdSeverity, calculateThresholds, checkThresholds } from '../utilities/bundle-calculator';
 
 const PLUGIN_NAME = 'AnyComponentStyleBudgetChecker';
@@ -16,7 +18,7 @@ const PLUGIN_NAME = 'AnyComponentStyleBudgetChecker';
  * Check budget sizes for component styles by emitting a warning or error if a
  * budget is exceeded by a particular component's styles.
  */
-export class AnyComponentStyleBudgetChecker implements Plugin {
+export class AnyComponentStyleBudgetChecker {
   private readonly budgets: Budget[];
   constructor(budgets: Budget[]) {
     this.budgets = budgets.filter((budget) => budget.type === Type.AnyComponentStyle);
@@ -32,8 +34,16 @@ export class AnyComponentStyleBudgetChecker implements Plugin {
           return;
         }
 
+        const cssExtensions = [
+          '.css',
+          '.scss',
+          '.less',
+          '.styl',
+          '.sass',
+        ];
+
         const componentStyles = Object.keys(compilation.assets)
-            .filter((name) => name.endsWith('.css'))
+            .filter((name) => cssExtensions.includes(path.extname(name)))
             .map((name) => ({
               size: compilation.assets[name].size(),
               label: name,
@@ -44,10 +54,10 @@ export class AnyComponentStyleBudgetChecker implements Plugin {
           for (const { severity, message } of checkThresholds(thresholds[Symbol.iterator](), size, label)) {
             switch (severity) {
               case ThresholdSeverity.Warning:
-                compilation.warnings.push(message);
+                addWarning(compilation, message);
                 break;
               case ThresholdSeverity.Error:
-                compilation.errors.push(message);
+                addError(compilation, message);
                 break;
               default:
                 assertNever(severity);

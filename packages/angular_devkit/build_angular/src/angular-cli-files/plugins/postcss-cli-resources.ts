@@ -46,7 +46,11 @@ async function resolve(
   }
 }
 
-export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResourcesOptions) => {
+export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResourcesOptions | undefined) => {
+  if (!options) {
+    throw new Error('No options were specified to "postcss-cli-resources".');
+  }
+
   const {
     deployUrl = '',
     baseHref = '',
@@ -81,11 +85,7 @@ export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResou
       return cachedUrl;
     }
 
-    if (inputUrl.startsWith('~')) {
-      inputUrl = inputUrl.substr(1);
-    }
-
-    if (inputUrl.startsWith('/')) {
+    if (rebaseRootRelative && inputUrl.startsWith('/')) {
       let outputUrl = '';
       if (deployUrl.match(/:\/\//) || deployUrl.startsWith('/')) {
         // If deployUrl is absolute or root relative, ignore baseHref & use deployUrl as is.
@@ -101,6 +101,10 @@ export default postcss.plugin('postcss-cli-resources', (options: PostcssCliResou
       resourceCache.set(cacheKey, outputUrl);
 
       return outputUrl;
+    }
+
+    if (inputUrl.startsWith('~')) {
+      inputUrl = inputUrl.substr(1);
     }
 
     const { pathname, hash, search } = url.parse(inputUrl.replace(/\\/g, '/'));

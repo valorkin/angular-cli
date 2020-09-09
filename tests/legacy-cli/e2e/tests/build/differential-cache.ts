@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { rimraf } from '../../utils/fs';
+import { rimraf, replaceInFile } from '../../utils/fs';
 import { ng } from '../../utils/process';
 
 function generateFileHashMap(): Map<string, string> {
@@ -36,8 +36,20 @@ function validateHashes(
 }
 
 export default async function() {
+  // Skip on CI due to large variability of performance
+  if (process.env['CI']) {
+    return;
+  }
+
   let oldHashes: Map<string, string>;
   let newHashes: Map<string, string>;
+
+  // Enable Differential loading to run both size checks
+  await replaceInFile(
+    '.browserslistrc',
+    'not IE 11',
+    'IE 11',
+  );
 
   // Remove the cache so that an initial build and build with cache can be tested
   await rimraf('./node_modules/.cache');

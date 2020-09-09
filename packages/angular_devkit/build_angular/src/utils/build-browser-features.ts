@@ -11,14 +11,14 @@ import { feature, features } from 'caniuse-lite';
 import * as ts from 'typescript';
 
 export class BuildBrowserFeatures {
-  private readonly _supportedBrowsers: string[];
   private readonly _es6TargetOrLater: boolean;
+  readonly supportedBrowsers: string[];
 
   constructor(
     private projectRoot: string,
     private scriptTarget: ts.ScriptTarget,
   ) {
-    this._supportedBrowsers = browserslist(undefined, { path: this.projectRoot });
+    this.supportedBrowsers = browserslist(undefined, { path: this.projectRoot });
     this._es6TargetOrLater = this.scriptTarget > ts.ScriptTarget.ES5;
   }
 
@@ -38,25 +38,6 @@ export class BuildBrowserFeatures {
   }
 
   /**
-   * Safari 10.1 and iOS Safari 10.3 supports modules,
-   * but does not support the `nomodule` attribute.
-   * While return `true`, when support for Safari 10.1 and iOS Safari 10.3
-   * is required and in differential loading is enabled.
-   */
-  isNoModulePolyfillNeeded(): boolean {
-    if (!this.isDifferentialLoadingNeeded()) {
-      return false;
-    }
-
-    const safariBrowsers = [
-      'safari 10.1',
-      'ios_saf 10.3',
-    ];
-
-    return this._supportedBrowsers.some(browser => safariBrowsers.includes(browser));
-  }
-
-  /**
    * True, when a browser feature is supported partially or fully.
    */
   isFeatureSupported(featureId: string): boolean {
@@ -71,7 +52,7 @@ export class BuildBrowserFeatures {
 
     const data = feature(features[featureId]);
 
-    return !this._supportedBrowsers
+    return !this.supportedBrowsers
       .some(browser => {
         const [agentId, version] = browser.split(' ');
 

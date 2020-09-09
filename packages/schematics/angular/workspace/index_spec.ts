@@ -5,6 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import { JsonParseMode, parseJson } from '@angular-devkit/core';
 import { SchematicTestRunner } from '@angular-devkit/schematics/testing';
 import { latestVersions } from '../utility/latest-versions';
 import { Schema as WorkspaceOptions } from './schema';
@@ -74,13 +75,31 @@ describe('Workspace Schematic', () => {
 
   it('should not add strict compiler options when false', async () => {
     const tree = await schematicRunner.runSchematicAsync('workspace', { ...defaultOptions, strict: false }).toPromise();
-    const { compilerOptions } = JSON.parse(tree.readContent('/tsconfig.json'));
-    expect(compilerOptions.strictNullChecks).not.toBeDefined();
+    const { compilerOptions, angularCompilerOptions } =
+      // tslint:disable-next-line: no-any
+      parseJson(tree.readContent('tsconfig.json').toString(), JsonParseMode.Loose) as any;
+    expect(compilerOptions.strict).toBeUndefined();
+    expect(angularCompilerOptions).toBeUndefined();
   });
 
-  it('should not add strict compiler options when true', async () => {
+  it('should add strict compiler options when true', async () => {
     const tree = await schematicRunner.runSchematicAsync('workspace', { ...defaultOptions, strict: true }).toPromise();
-    const { compilerOptions } = JSON.parse(tree.readContent('/tsconfig.json'));
-    expect(compilerOptions.strictNullChecks).toBe(true);
+    const { compilerOptions, angularCompilerOptions } =
+      // tslint:disable-next-line: no-any
+      parseJson(tree.readContent('tsconfig.json').toString(), JsonParseMode.Loose) as any;
+    expect(compilerOptions.strict).toBe(true);
+    expect(angularCompilerOptions.strictTemplates).toBe(true);
+  });
+
+  it('should not add strict lint options when false', async () => {
+    const tree = await schematicRunner.runSchematicAsync('workspace', { ...defaultOptions, strict: false }).toPromise();
+    const { rules } = JSON.parse(tree.readContent('/tslint.json'));
+    expect(rules['no-any']).toBeUndefined();
+  });
+
+  it('should add strict lint options when true', async () => {
+    const tree = await schematicRunner.runSchematicAsync('workspace', { ...defaultOptions, strict: true }).toPromise();
+    const { rules } = JSON.parse(tree.readContent('/tslint.json'));
+    expect(rules['no-any']).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ import { ParsedConfiguration } from '@angular/compiler-cli';
 import {
   AssetPatternClass,
   Budget,
+  CrossOrigin,
   ExtraEntryPoint,
   I18NMissingTranslation,
   Localize,
@@ -28,10 +29,6 @@ export interface BuildOptions {
   resourcesOutputPath?: string;
   aot?: boolean;
   sourceMap: SourceMapClass;
-  /** @deprecated since version 8. use sourceMap instead. */
-  vendorSourceMap?: boolean;
-  /** @deprecated since version 8 */
-  evalSourceMap?: boolean;
   vendorChunk?: boolean;
   commonChunk?: boolean;
   baseHref?: string;
@@ -50,6 +47,7 @@ export interface BuildOptions {
   bundleDependencies?: boolean;
   externalDependencies?: string[];
   watch?: boolean;
+  hmr?: boolean;
   outputHashing?: string;
   poll?: number;
   deleteOutputPath?: boolean;
@@ -58,16 +56,12 @@ export interface BuildOptions {
   showCircularDependencies?: boolean;
   buildOptimizer?: boolean;
   namedChunks?: boolean;
+  crossOrigin?: CrossOrigin;
   subresourceIntegrity?: boolean;
   serviceWorker?: boolean;
   webWorkerTsConfig?: string;
-  /** @deprecated since version 8 **/
-  skipAppShell?: boolean;
   statsJson: boolean;
   forkTypeChecker: boolean;
-  profile?: boolean;
-  /** @deprecated since version 8 **/
-  es5BrowserSupport?: boolean;
 
   main: string;
   polyfills?: string;
@@ -85,8 +79,8 @@ export interface BuildOptions {
 
   /* Append script target version to filename. */
   esVersionInFileName?: boolean;
-
   experimentalRollupPass?: boolean;
+  allowedCommonJsDependencies?: string[];
 }
 
 export interface WebpackTestOptions extends BuildOptions {

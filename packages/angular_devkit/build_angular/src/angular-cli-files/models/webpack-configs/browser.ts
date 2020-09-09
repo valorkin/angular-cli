@@ -5,53 +5,50 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { LicenseWebpackPlugin } from 'license-webpack-plugin';
 import * as webpack from 'webpack';
+import { CommonJsUsageWarnPlugin } from '../../plugins/webpack';
 import { WebpackConfigOptions } from '../build-options';
-import { getSourceMapDevTool, isPolyfillsEntry, normalizeExtraEntryPoints } from './utils';
-
-const SubresourceIntegrityPlugin = require('webpack-subresource-integrity');
-
+import { getSourceMapDevTool } from './utils';
 
 export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configuration {
   const { buildOptions } = wco;
+  const {
+    crossOrigin = 'none',
+    subresourceIntegrity,
+    extractLicenses,
+    vendorChunk,
+    commonChunk,
+    allowedCommonJsDependencies,
+  } = buildOptions;
+
   const extraPlugins = [];
 
-  let isEval = false;
-  const { styles: stylesOptimization, scripts: scriptsOptimization } = buildOptions.optimization;
   const {
     styles: stylesSourceMap,
     scripts: scriptsSourceMap,
     hidden: hiddenSourceMap,
   } = buildOptions.sourceMap;
 
-  // See https://webpack.js.org/configuration/devtool/ for sourcemap types.
-  if ((stylesSourceMap || scriptsSourceMap) &&
-    buildOptions.evalSourceMap &&
-    !stylesOptimization &&
-    !scriptsOptimization) {
-    // Produce eval sourcemaps for development with serve, which are faster.
-    isEval = true;
-  }
-
-  if (buildOptions.subresourceIntegrity) {
+  if (subresourceIntegrity) {
+    const SubresourceIntegrityPlugin = require('webpack-subresource-integrity');
     extraPlugins.push(new SubresourceIntegrityPlugin({
       hashFuncNames: ['sha384'],
     }));
   }
 
-  if (buildOptions.extractLicenses) {
+  if (extractLicenses) {
+    const LicenseWebpackPlugin = require('license-webpack-plugin').LicenseWebpackPlugin;
     extraPlugins.push(new LicenseWebpackPlugin({
       stats: {
         warnings: false,
         errors: false,
       },
       perChunkOutput: false,
-      outputFilename: `3rdpartylicenses.txt`,
+      outputFilename: '3rdpartylicenses.txt',
     }));
   }
 
-  if (!isEval && (scriptsSourceMap || stylesSourceMap)) {
+  if (scriptsSourceMap || stylesSourceMap) {
     extraPlugins.push(getSourceMapDevTool(
       scriptsSourceMap,
       stylesSourceMap,
@@ -59,31 +56,32 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
     ));
   }
 
-  const globalStylesBundleNames = normalizeExtraEntryPoints(buildOptions.styles, 'styles')
-    .map(style => style.bundleName);
+  let crossOriginLoading: 'anonymous' | 'use-credentials' | false = false;
+  if (subresourceIntegrity && crossOrigin === 'none') {
+    crossOriginLoading = 'anonymous';
+  } else if (crossOrigin !== 'none') {
+    crossOriginLoading = crossOrigin;
+  }
 
   return {
-    devtool: isEval ? 'eval' : false,
+    devtool: false,
     resolve: {
-      mainFields: [
-        ...(wco.supportES2015 ? ['es2015'] : []),
-        'browser', 'module', 'main',
-      ],
+      mainFields: ['es2015', 'browser', 'module', 'main'],
     },
     output: {
-      crossOriginLoading: buildOptions.subresourceIntegrity ? 'anonymous' : false,
+      crossOriginLoading,
     },
     optimization: {
       runtimeChunk: 'single',
       splitChunks: {
         maxAsyncRequests: Infinity,
         cacheGroups: {
-          default: !!buildOptions.commonChunk && {
+          default: !!commonChunk && {
             chunks: 'async',
             minChunks: 2,
             priority: 10,
           },
-          common: !!buildOptions.commonChunk && {
+          common: !!commonChunk && {
             name: 'common',
             chunks: 'async',
             minChunks: 2,
@@ -91,16 +89,21 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
             priority: 5,
           },
           vendors: false,
-          vendor: !!buildOptions.vendorChunk && {
+          defaultVendors: !!vendorChunk && {
             name: 'vendor',
+            chunks: (chunk) => chunk.name === 'main',
             enforce: true,
             test: /[\\/]node_modules[\\/]/,
-            chunks: ({ name }) => !isPolyfillsEntry(name) || !globalStylesBundleNames.includes(name),
           },
         },
       },
     },
-    plugins: extraPlugins,
+    plugins: [
+      new CommonJsUsageWarnPlugin({
+        allowedDepedencies: allowedCommonJsDependencies,
+      }),
+      ...extraPlugins,
+    ],
     node: false,
   };
 }

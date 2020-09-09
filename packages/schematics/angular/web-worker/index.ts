@@ -6,12 +6,9 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {
-  JsonAstArray,
-  JsonParseMode,
   dirname,
   join,
   normalize,
-  parseJsonAst,
   strings,
   tags,
 } from '@angular-devkit/core';
@@ -19,7 +16,7 @@ import {
   Rule, SchematicContext, SchematicsException, Tree,
   apply, applyTemplates, chain, mergeWith, move, noop, url,
 } from '@angular-devkit/schematics';
-import { appendValueInAstArray, findPropertyInAstObject } from '../utility/json-utils';
+import { JSONFile } from '../utility/json-file';
 import { parseName } from '../utility/parse-name';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
 import { buildDefaultPath, getWorkspace, updateWorkspace } from '../utility/workspace';
@@ -36,23 +33,13 @@ function addConfig(options: WebWorkerOptions, root: string, tsConfigPath: string
     const isInSrc = dirname(normalize(tsConfigPath)).endsWith('src');
     const workerGlob = `${isInSrc ? '' : 'src/'}**/*.worker.ts`;
 
-    const buffer = host.read(tsConfigPath);
-    if (buffer) {
-      const tsCfgAst = parseJsonAst(buffer.toString(), JsonParseMode.Loose);
-      if (tsCfgAst.kind != 'object') {
-        throw new SchematicsException('Invalid tsconfig. Was expecting an object');
+    try {
+      const json = new JSONFile(host, tsConfigPath);
+      const exclude = json.get(['exclude']);
+      if (exclude && Array.isArray(exclude) && !exclude.includes(workerGlob)) {
+        json.modify(['exclude'], [...exclude, workerGlob]);
       }
-      const filesAstNode = findPropertyInAstObject(tsCfgAst, 'exclude');
-      if (filesAstNode && filesAstNode.kind != 'array') {
-        throw new SchematicsException('Invalid tsconfig "exclude" property; expected an array.');
-      }
-
-      if (filesAstNode && !(filesAstNode as JsonAstArray).value.includes(workerGlob)) {
-        const recorder = host.beginUpdate(tsConfigPath);
-        appendValueInAstArray(recorder, filesAstNode as JsonAstArray, workerGlob);
-        host.commitUpdate(recorder);
-      }
-    }
+    } catch {}
 
     return mergeWith(
       apply(url('./files/worker-tsconfig'), [
@@ -121,7 +108,6 @@ export default function (options: WebWorkerOptions): Rule {
     if (!options.target) {
       throw new SchematicsException('Option "target" is required.');
     }
-
     const project = workspace.projects.get(options.project);
     if (!project) {
       throw new SchematicsException(`Invalid project name (${options.project})`);

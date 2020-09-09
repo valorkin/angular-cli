@@ -5,16 +5,22 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { JsonAstObject, logging } from '@angular-devkit/core';
+import { JsonAstObject, join, logging, normalize } from '@angular-devkit/core';
 import { Rule, Tree, UpdateRecorder } from '@angular-devkit/schematics';
-import { posix } from 'path';
+import { dirname, relative } from 'path';
 import {
   findPropertyInAstObject,
   insertPropertyInAstObjectInOrder,
   removePropertyInAstObject,
 } from '../../utility/json-utils';
 import { Builders } from '../../utility/workspace-models';
-import { getAllOptions, getTargets, getWorkspace, readJsonFileAsAstObject } from './utils';
+import {
+  forwardSlashPath,
+  getAllOptions,
+  getTargets,
+  getWorkspace,
+  readJsonFileAsAstObject,
+} from './utils';
 
 /**
  * Update the tsconfig files for applications
@@ -30,23 +36,29 @@ export function updateApplicationTsConfigs(): Rule {
     // Add `module` option in the workspace tsconfig
     updateModuleCompilerOption(tree, '/tsconfig.json');
 
-    for (const { target } of getTargets(workspace, 'build', Builders.Browser)) {
-      updateTsConfig(tree, target, Builders.Browser, logger);
+    for (const { target, project } of getTargets(workspace, 'build', Builders.Browser)) {
+      updateTsConfig(tree, target, project, Builders.Browser, logger);
     }
 
-    for (const { target } of getTargets(workspace, 'server', Builders.Server)) {
-      updateTsConfig(tree, target, Builders.Server, logger);
+    for (const { target, project } of getTargets(workspace, 'server', Builders.Server)) {
+      updateTsConfig(tree, target, project, Builders.Server, logger);
     }
 
-    for (const { target } of getTargets(workspace, 'test', Builders.Karma)) {
-      updateTsConfig(tree, target, Builders.Karma, logger);
+    for (const { target, project } of getTargets(workspace, 'test', Builders.Karma)) {
+      updateTsConfig(tree, target, project, Builders.Karma, logger);
     }
 
     return tree;
   };
 }
 
-function updateTsConfig(tree: Tree, builderConfig: JsonAstObject, builderName: Builders, logger: logging.LoggerApi) {
+function updateTsConfig(
+  tree: Tree,
+  builderConfig: JsonAstObject,
+  project: JsonAstObject,
+  builderName: Builders,
+  logger: logging.LoggerApi,
+) {
   const options = getAllOptions(builderConfig);
   for (const option of options) {
     let recorder: UpdateRecorder;
@@ -102,20 +114,35 @@ function updateTsConfig(tree: Tree, builderConfig: JsonAstObject, builderName: B
           recorder.insertLeft(start.offset, tsInclude.text.replace('.ts', '.d.ts'));
           tree.commitUpdate(recorder);
         }
+      } else {
+        // Includes are not present, add includes to dts files
+        // By default when 'include' nor 'files' fields are used TypeScript
+        // will include all ts files.
+        const srcRootAst = findPropertyInAstObject(project, 'sourceRoot');
+        const include = srcRootAst?.kind === 'string'
+          ? join(normalize(srcRootAst.value), '**/*.d.ts')
+          : '**/*.d.ts';
+
+        recorder = tree.beginUpdate(tsConfigPath);
+        insertPropertyInAstObjectInOrder(recorder, tsConfigAst, 'include', [include], 2);
+        tree.commitUpdate(recorder);
       }
 
       const files = findPropertyInAstObject(tsConfigAst, 'files');
       if (!files) {
         const newFiles: string[] = [];
+        const tsConfigDir = dirname(forwardSlashPath(tsConfigPath));
 
         const mainOption = findPropertyInAstObject(option, 'main');
         if (mainOption && mainOption.kind === 'string') {
-          newFiles.push(posix.relative(posix.dirname(tsConfigPath), mainOption.value));
+          newFiles.push(
+            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(mainOption.value))));
         }
 
         const polyfillsOption = findPropertyInAstObject(option, 'polyfills');
         if (polyfillsOption && polyfillsOption.kind === 'string') {
-          newFiles.push(posix.relative(posix.dirname(tsConfigPath), polyfillsOption.value));
+          newFiles.push(
+            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(polyfillsOption.value))));
         }
 
         if (newFiles.length) {

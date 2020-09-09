@@ -5,7 +5,6 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as stableStringify from 'fast-json-stable-stringify';
 import {
   JsonAstArray,
   JsonAstKeyValue,
@@ -14,6 +13,8 @@ import {
   JsonObject,
   JsonValue,
 } from '../../json';
+
+import stableStringify = require('fast-json-stable-stringify');
 
 interface CacheEntry {
   value?: JsonValue;
@@ -147,7 +148,7 @@ function create(
       const propertyPath = path + '/' + escapeKey(p);
       const cacheEntry = cache.get(propertyPath);
       if (cacheEntry) {
-        if (cacheEntry.value) {
+        if (cacheEntry.value !== undefined) {
           return createPropertyDescriptor(cacheEntry.value);
         }
 
@@ -206,6 +207,12 @@ function create(
       return value;
     },
     set(target: {}, p: PropertyKey, value: unknown): boolean {
+      if (value === undefined) {
+        // setting to undefined is equivalent to a delete
+        // tslint:disable-next-line: no-non-null-assertion
+        return this.deleteProperty!(target, p);
+      }
+
       if (typeof p === 'symbol' || Reflect.has(target, p)) {
         return Reflect.set(target, p, value);
       } else if (excluded.has(p) || (included && !included.has(p))) {
@@ -250,13 +257,23 @@ function create(
         if (cacheEntry.node) {
           alteredNodes.add(cacheEntry.node);
         }
-        reporter(propertyPath, cacheEntry.parent, cacheEntry.node, oldValue, undefined);
+        if (cacheEntry.parent.kind === 'keyvalue') {
+          // Remove the entire key/value pair from this JSON object
+          reporter(propertyPath, ast, cacheEntry.node, oldValue, undefined);
+        } else {
+          reporter(propertyPath, cacheEntry.parent, cacheEntry.node, oldValue, undefined);
+        }
       } else {
         const { node, parent } = findNode(ast, p);
         if (node) {
           cache.set(propertyPath, { node, parent, value: undefined });
           alteredNodes.add(node);
-          reporter(propertyPath, parent, node, node && node.value, undefined);
+          if (parent.kind === 'keyvalue') {
+            // Remove the entire key/value pair from this JSON object
+            reporter(propertyPath, ast, node, node && node.value, undefined);
+          } else {
+            reporter(propertyPath, parent, node, node && node.value, undefined);
+          }
         }
       }
 

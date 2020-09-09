@@ -5,11 +5,11 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import { JsonParseMode, parseJson } from '@angular-devkit/core';
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { Schema as ApplicationOptions } from '../application/schema';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as WebWorkerOptions } from './schema';
-
 
 describe('Web Worker Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
@@ -59,7 +59,8 @@ describe('Web Worker Schematic', () => {
     const path = '/projects/bar/tsconfig.worker.json';
     expect(tree.exists(path)).toEqual(true);
 
-    const { compilerOptions } = JSON.parse(tree.readContent(path));
+    // tslint:disable-next-line: no-any
+    const { compilerOptions } = parseJson(tree.readContent(path).toString(), JsonParseMode.Loose) as any;
     expect(compilerOptions.outDir).toBe('../../out-tsc/worker');
   });
 
@@ -123,7 +124,8 @@ describe('Web Worker Schematic', () => {
     const path = '/tsconfig.worker.json';
     expect(tree.exists(path)).toEqual(true);
 
-    const { compilerOptions } = JSON.parse(tree.readContent(path));
+    // tslint:disable-next-line: no-any
+    const { compilerOptions } = parseJson(tree.readContent(path).toString(), JsonParseMode.Loose) as any;
     expect(compilerOptions.outDir).toBe('./out-tsc/worker');
   });
 

@@ -8,7 +8,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import { copyFile } from './copy-file';
-import { manglingDisabled } from './environment-options';
+import { allowMangle } from './environment-options';
 import { CacheKey, ProcessBundleOptions, ProcessBundleResult } from './process-bundle';
 
 const cacache = require('cacache');
@@ -42,7 +42,7 @@ export class BundleActionCache {
       .update(content)
       .digest('base64');
     let baseCacheKey = `${packageVersion}|${content.length}|${algorithm}-${codeHash}`;
-    if (manglingDisabled) {
+    if (!allowMangle) {
       baseCacheKey += '|MD';
     }
 
@@ -50,38 +50,44 @@ export class BundleActionCache {
   }
 
   generateCacheKeys(action: ProcessBundleOptions): string[] {
+    // Postfix added to sourcemap cache keys when vendor, hidden sourcemaps are present
+    // Allows non-destructive caching of both variants
+    const sourceMapVendorPostfix = action.sourceMaps && action.vendorSourceMaps ? '|vendor' : '';
+
+    // sourceMappingURL is added at the very end which causes the code to be the same when sourcemaps are enabled/disabled
+    // When using hiddenSourceMaps we can omit the postfix since sourceMappingURL will not be added.
+    // When having sourcemaps a hashed file and non hashed file can have the same content. But the sourceMappingURL will differ.
+    const sourceMapPostFix = action.sourceMaps && !action.hiddenSourceMaps ? `|sourcemap|${action.filename}` : '';
+
     const baseCacheKey = this.generateBaseCacheKey(action.code);
 
-    // Postfix added to sourcemap cache keys when vendor sourcemaps are present
-    // Allows non-destructive caching of both variants
-    const SourceMapVendorPostfix = !!action.sourceMaps && action.vendorSourceMaps ? '|vendor' : '';
-
     // Determine cache entries required based on build settings
-    const cacheKeys = [];
+    const cacheKeys: string[] = [];
 
     // If optimizing and the original is not ignored, add original as required
-    if ((action.optimize || action.optimizeOnly) && !action.ignoreOriginal) {
-      cacheKeys[CacheKey.OriginalCode] = baseCacheKey + '|orig';
+    if (!action.ignoreOriginal) {
+      cacheKeys[CacheKey.OriginalCode] = baseCacheKey + sourceMapPostFix + '|orig';
 
       // If sourcemaps are enabled, add original sourcemap as required
       if (action.sourceMaps) {
-        cacheKeys[CacheKey.OriginalMap] = baseCacheKey + SourceMapVendorPostfix + '|orig-map';
+        cacheKeys[CacheKey.OriginalMap] = baseCacheKey + sourceMapVendorPostfix + '|orig-map';
       }
     }
+
     // If not only optimizing, add downlevel as required
     if (!action.optimizeOnly) {
-      cacheKeys[CacheKey.DownlevelCode] = baseCacheKey + '|dl';
+      cacheKeys[CacheKey.DownlevelCode] = baseCacheKey + sourceMapPostFix + '|dl';
 
       // If sourcemaps are enabled, add downlevel sourcemap as required
       if (action.sourceMaps) {
-        cacheKeys[CacheKey.DownlevelMap] = baseCacheKey + SourceMapVendorPostfix + '|dl-map';
+        cacheKeys[CacheKey.DownlevelMap] = baseCacheKey + sourceMapVendorPostfix + '|dl-map';
       }
     }
 
     return cacheKeys;
   }
 
-  async getCacheEntries(cacheKeys: (string | null)[]): Promise<(CacheEntry | null)[] | false> {
+  async getCacheEntries(cacheKeys: (string | undefined)[]): Promise<(CacheEntry | null)[] | false> {
     // Attempt to get required cache entries
     const cacheEntries = [];
     for (const key of cacheKeys) {
@@ -148,7 +154,7 @@ export class BundleActionCache {
     cacheEntry = entries[CacheKey.DownlevelCode];
     if (cacheEntry) {
       result.downlevel = {
-        filename: action.filename.replace(/\-es20\d{2}/, '-es5'),
+        filename: action.filename.replace(/\-(es20\d{2}|esnext)/, '-es5'),
         size: cacheEntry.size,
         integrity: cacheEntry.integrity,
       };
@@ -158,7 +164,7 @@ export class BundleActionCache {
       cacheEntry = entries[CacheKey.DownlevelMap];
       if (cacheEntry) {
         result.downlevel.map = {
-          filename: action.filename.replace(/\-es20\d{2}/, '-es5') + '.map',
+          filename: action.filename.replace(/\-(es20\d{2}|esnext)/, '-es5') + '.map',
           size: cacheEntry.size,
         };
 

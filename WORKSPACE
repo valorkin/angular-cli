@@ -8,16 +8,16 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "build_bazel_rules_nodejs",
-    sha256 = "a54b2511d6dae42c1f7cdaeb08144ee2808193a088004fc3b464a04583d5aa2e",
-    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/0.42.3/rules_nodejs-0.42.3.tar.gz"],
+    sha256 = "10fffa29f687aa4d8eb6dfe8731ab5beb63811ab00981fc84a93899641fd4af1",
+    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/2.0.3/rules_nodejs-2.0.3.tar.gz"],
 )
 
 # We use protocol buffers for the Build Event Protocol
 git_repository(
     name = "com_google_protobuf",
-    commit = "beaeaeda34e97a6ff9735b33a66e011102ab506b",
+    commit = "6263268b8c1b78a8a9b65acd6f5dd5c04dd9b0e1",
     remote = "https://github.com/protocolbuffers/protobuf",
-    shallow_since = "1559159889 -0400",
+    shallow_since = "1576607245 -0800",
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
@@ -25,7 +25,7 @@ load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 protobuf_deps()
 
 # Check the bazel version and download npm dependencies
-load("@build_bazel_rules_nodejs//:defs.bzl", "check_bazel_version", "check_rules_nodejs_version", "node_repositories", "yarn_install")
+load("@build_bazel_rules_nodejs//:index.bzl", "check_bazel_version", "check_rules_nodejs_version", "node_repositories", "yarn_install")
 
 # Bazel version must be at least the following version because:
 #   - 0.26.0 managed_directories feature added which is required for nodejs rules 0.30.0
@@ -33,11 +33,11 @@ load("@build_bazel_rules_nodejs//:defs.bzl", "check_bazel_version", "check_rules
 check_bazel_version(
     message = """
 You no longer need to install Bazel on your machine.
-Angular has a dependency on the @bazel/bazel package which supplies it.
+Angular has a dependency on the @bazel/bazelisk package which supplies it.
 Try running `yarn bazel` instead.
     (If you did run that, check that you've got a fresh `yarn install`)
 """,
-    minimum_bazel_version = "0.27.0",
+    minimum_bazel_version = "3.0.0",
 )
 
 # The NodeJS rules version must be at least the following version because:
@@ -52,29 +52,21 @@ Try running `yarn bazel` instead.
 #   - 0.32.1 remove override of @bazel/tsetse & exclude typescript lib declarations in node_module_library transitive_declarations
 #   - 0.32.2 resolves bug in @bazel/hide-bazel-files postinstall step
 #   - 0.34.0 introduces protractor rule
-check_rules_nodejs_version(minimum_version_string = "0.34.0")
+check_rules_nodejs_version(minimum_version_string = "2.0.0")
 
 # Setup the Node.js toolchain
 node_repositories(
     node_repositories = {
-        "10.16.0-darwin_amd64": ("node-v10.16.0-darwin-x64.tar.gz", "node-v10.16.0-darwin-x64", "6c009df1b724026d84ae9a838c5b382662e30f6c5563a0995532f2bece39fa9c"),
-        "10.16.0-linux_amd64": ("node-v10.16.0-linux-x64.tar.xz", "node-v10.16.0-linux-x64", "1827f5b99084740234de0c506f4dd2202a696ed60f76059696747c34339b9d48"),
-        "10.16.0-windows_amd64": ("node-v10.16.0-win-x64.zip", "node-v10.16.0-win-x64", "aa22cb357f0fb54ccbc06b19b60e37eefea5d7dd9940912675d3ed988bf9a059"),
+        "12.14.1-darwin_amd64": ("node-v12.14.1-darwin-x64.tar.gz", "node-v12.14.1-darwin-x64", "0be10a28737527a1e5e3784d3ad844d742fe8b0718acd701fd48f718fd3af78f"),
+        "12.14.1-linux_amd64": ("node-v12.14.1-linux-x64.tar.xz", "node-v12.14.1-linux-x64", "07cfcaa0aa9d0fcb6e99725408d9e0b07be03b844701588e3ab5dbc395b98e1b"),
+        "12.14.1-windows_amd64": ("node-v12.14.1-win-x64.zip", "node-v12.14.1-win-x64", "1f96ccce3ba045ecea3f458e189500adb90b8bc1a34de5d82fc10a5bf66ce7e3"),
     },
-    node_version = "10.16.0",
+    node_version = "12.14.1",
     package_json = ["//:package.json"],
     yarn_repositories = {
-        "1.17.3": ("yarn-v1.17.3.tar.gz", "yarn-v1.17.3", "e3835194409f1b3afa1c62ca82f561f1c29d26580c9e220c36866317e043c6f3"),
+        "1.22.4": ("yarn-v1.22.4.tar.gz", "yarn-v1.22.4", "bc5316aa110b2f564a71a3d6e235be55b98714660870c5b6b2d2d3f12587fb58"),
     },
-    # yarn 1.13.0 under Bazel has a regression on Windows that causes build errors on rebuilds:
-    # ```
-    # ERROR: Source forest creation failed: C:/.../fyuc5c3n/execroot/angular/external (Directory not empty)
-    # ```
-    # See https://github.com/angular/angular/pull/29431 for more information.
-    # It possible that versions of yarn past 1.13.0 do not have this issue, however, before
-    # advancing this version we need to test manually on Windows that the above error does not
-    # happen as the issue is not caught by CI.
-    yarn_version = "1.17.3",
+    yarn_version = "1.22.4",
 )
 
 yarn_install(
@@ -83,32 +75,17 @@ yarn_install(
         "//:tools/yarn/check-yarn.js",
     ],
     package_json = "//:package.json",
-    symlink_node_modules = False,
     yarn_lock = "//:yarn.lock",
 )
 
 load("@npm//:install_bazel_dependencies.bzl", "install_bazel_dependencies")
 
-install_bazel_dependencies()
-
-load("@npm_bazel_typescript//:index.bzl", "ts_setup_workspace")
-
-ts_setup_workspace()
-
-# Load karma dependencies
-load("@npm_bazel_karma//:package.bzl", "npm_bazel_karma_dependencies")
-
-npm_bazel_karma_dependencies()
+install_bazel_dependencies(suppress_warning = True)
 
 # Load labs dependencies
-load("@npm_bazel_labs//:package.bzl", "npm_bazel_labs_dependencies")
+load("@npm//@bazel/labs:package.bzl", "npm_bazel_labs_dependencies")
 
 npm_bazel_labs_dependencies()
-
-# Setup the rules_webtesting toolchain
-load("@io_bazel_rules_webtesting//web:repositories.bzl", "web_test_repositories")
-
-web_test_repositories()
 
 ##########################
 # Remote Execution Setup #
@@ -116,9 +93,9 @@ web_test_repositories()
 # Bring in bazel_toolchains for RBE setup configuration.
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "fc55f4d9ee8e3d9535395717d3ee892116d9bccaa386c447a1cb100d4509affe",
-    strip_prefix = "bazel-toolchains-1.2.3",
-    url = "https://github.com/bazelbuild/bazel-toolchains/archive/1.2.3.tar.gz",
+    sha256 = "7ebb200ed3ca3d1f7505659c7dfed01c4b5cb04c3a6f34140726fe22f5d35e86",
+    strip_prefix = "bazel-toolchains-3.4.1",
+    url = "https://github.com/bazelbuild/bazel-toolchains/archive/3.4.1.tar.gz",
 )
 
 load("@bazel_toolchains//rules:environments.bzl", "clang_env")
@@ -129,17 +106,18 @@ rbe_autoconfig(
     # Need to specify a base container digest in order to ensure that we can use the checked-in
     # platform configurations for the "ubuntu16_04" image. Otherwise the autoconfig rule would
     # need to pull the image and run it in order determine the toolchain configuration. See:
-    # https://github.com/bazelbuild/bazel-toolchains/blob/1.1.2/configs/ubuntu16_04_clang/versions.bzl
-    base_container_digest = "sha256:1ab40405810effefa0b2f45824d6d608634ccddbf06366760c341ef6fbead011",
+    # https://github.com/bazelbuild/bazel-toolchains/blob/3.4.1/configs/ubuntu16_04_clang/versions.bzl
+    base_container_digest = "sha256:b27c9c4786d5bd1c709aa979b7432328806e0ff671e2175d696584eec4fd0ec3",
     # Note that if you change the `digest`, you might also need to update the
     # `base_container_digest` to make sure marketplace.gcr.io/google/rbe-ubuntu16-04-webtest:<digest>
     # and marketplace.gcr.io/google/rbe-ubuntu16-04:<base_container_digest> have
     # the same Clang and JDK installed. Clang is needed because of the dependency on
     # @com_google_protobuf. Java is needed for the Bazel's test executor Java tool.
-    digest = "sha256:0b8fa87db4b8e5366717a7164342a029d1348d2feea7ecc4b18c780bc2507059",
+    digest = "sha256:f743114235a43355bf8324e2ba0fa6a597236fe06f7bc99aaa9ac703631c306b",
     env = clang_env(),
     registry = "marketplace.gcr.io",
     # We can't use the default "ubuntu16_04" RBE image provided by the autoconfig because we need
     # a specific Linux kernel that comes with "libx11" in order to run headless browser tests.
     repository = "google/rbe-ubuntu16-04-webtest",
+    use_checked_in_confs = "Force",
 )

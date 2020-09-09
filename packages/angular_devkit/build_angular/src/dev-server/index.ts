@@ -22,6 +22,7 @@ import * as ts from 'typescript';
 import * as url from 'url';
 import * as webpack from 'webpack';
 import * as WebpackDevServer from 'webpack-dev-server';
+import { normalizeExtraEntryPoints } from '../angular-cli-files/models/webpack-configs/utils';
 import { IndexHtmlWebpackPlugin } from '../angular-cli-files/plugins/index-html-webpack-plugin';
 import { checkPort } from '../angular-cli-files/utilities/check-port';
 import { IndexHtmlTransform } from '../angular-cli-files/utilities/index-file/write-index-html';
@@ -33,8 +34,10 @@ import { ExecutionTransformer } from '../transforms';
 import { BuildBrowserFeatures, normalizeOptimization } from '../utils';
 import { findCachePath } from '../utils/cache-path';
 import { I18nOptions } from '../utils/i18n-options';
+import { createI18nPlugins } from '../utils/process-bundle';
 import { assertCompatibleAngularVersion } from '../utils/version';
 import { getIndexInputFile, getIndexOutputFile } from '../utils/webpack-browser-config';
+import { addError, addWarning } from '../utils/webpack-diagnostics';
 import { Schema } from './schema';
 const open = require('open');
 
@@ -45,8 +48,6 @@ const devServerBuildOverriddenKeys: (keyof DevServerBuilderOptions)[] = [
   'optimization',
   'aot',
   'sourceMap',
-  'vendorSourceMap',
-  'evalSourceMap',
   'vendorChunk',
   'commonChunk',
   'baseHref',
@@ -55,48 +56,6 @@ const devServerBuildOverriddenKeys: (keyof DevServerBuilderOptions)[] = [
   'verbose',
   'deployUrl',
 ];
-
-async function createI18nPlugins(
-  locale: string,
-  translation: unknown | undefined,
-  missingTranslation?: 'error' | 'warning' | 'ignore',
-) {
-  const plugins = [];
-  // tslint:disable-next-line: no-implicit-dependencies
-  const localizeDiag = await import('@angular/localize/src/tools/src/diagnostics');
-
-  const diagnostics = new localizeDiag.Diagnostics();
-
-  const es2015 = await import(
-    // tslint:disable-next-line: trailing-comma no-implicit-dependencies
-    '@angular/localize/src/tools/src/translate/source_files/es2015_translate_plugin'
-  );
-  plugins.push(
-    // tslint:disable-next-line: no-any
-    es2015.makeEs2015TranslatePlugin(diagnostics, (translation || {}) as any, {
-      missingTranslation: translation === undefined ? 'ignore' : missingTranslation,
-    }),
-  );
-
-  const es5 = await import(
-    // tslint:disable-next-line: trailing-comma no-implicit-dependencies
-    '@angular/localize/src/tools/src/translate/source_files/es5_translate_plugin'
-  );
-  plugins.push(
-    // tslint:disable-next-line: no-any
-    es5.makeEs5TranslatePlugin(diagnostics, (translation || {}) as any, {
-      missingTranslation: translation === undefined ? 'ignore' : missingTranslation,
-    }),
-  );
-
-  const inlineLocale = await import(
-    // tslint:disable-next-line: trailing-comma no-implicit-dependencies
-    '@angular/localize/src/tools/src/translate/source_files/locale_plugin'
-  );
-  plugins.push(inlineLocale.makeLocalePlugin(locale));
-
-  return { diagnostics, plugins };
-}
 
 export type DevServerBuilderOutput = DevServerBuildOutput & {
   baseUrl: string;
@@ -217,7 +176,7 @@ export function serveWebpackBrowser(
 
       // Add live reload config.
       if (options.liveReload) {
-        _addLiveReload(options, browserOptions, webpackConfig, clientAddress, context.logger);
+        _addLiveReload(root, options, browserOptions, webpackConfig, clientAddress, context.logger);
       } else if (options.hmr) {
         context.logger.warn('Live reload is disabled. HMR option ignored.');
       }
@@ -329,14 +288,13 @@ async function setupLocalize(
   const localeDescription = i18n.locales[locale];
   const { plugins, diagnostics } = await createI18nPlugins(
     locale,
-    localeDescription && localeDescription.translation,
-    browserOptions.i18nMissingTranslation,
+    localeDescription?.translation,
+    browserOptions.i18nMissingTranslation || 'ignore',
   );
 
   // Modify main entrypoint to include locale data
   if (
-    localeDescription &&
-    localeDescription.dataPath &&
+    localeDescription?.dataPath &&
     typeof webpackConfig.entry === 'object' &&
     !Array.isArray(webpackConfig.entry) &&
     webpackConfig.entry['main']
@@ -348,17 +306,7 @@ async function setupLocalize(
     }
   }
 
-  // Get the insertion point for the i18n babel loader rule
-  // This is currently dependent on the rule order/construction in common.ts
-  // A future refactor of the webpack configuration definition will improve this situation
-  // tslint:disable-next-line: no-non-null-assertion
-  const rules = webpackConfig.module!.rules;
-  const index = rules.findIndex(r => r.enforce === 'pre');
-  if (index === -1) {
-    throw new Error('Invalid internal webpack configuration');
-  }
-
-  const i18nRule: webpack.Rule = {
+  const i18nRule: webpack.RuleSetRule = {
     test: /\.(?:m?js|ts)$/,
     enforce: 'post',
     use: [
@@ -366,24 +314,30 @@ async function setupLocalize(
         loader: require.resolve('babel-loader'),
         options: {
           babelrc: false,
+          configFile: false,
           compact: false,
           cacheCompression: false,
           cacheDirectory: findCachePath('babel-loader'),
           cacheIdentifier: JSON.stringify({
             buildAngular: require('../../package.json').version,
             locale,
-            translationIntegrity: localeDescription && localeDescription.integrity,
+            translationIntegrity: localeDescription?.files.map((file) => file.integrity),
           }),
           plugins,
-          parserOpts: {
-            plugins: ['dynamicImport'],
-          },
         },
       },
     ],
   };
 
-  rules.splice(index, 0, i18nRule);
+  // Get the rules and ensure the Webpack configuration is setup properly
+  const rules = webpackConfig.module?.rules || [];
+  if (!webpackConfig.module) {
+    webpackConfig.module = { rules };
+  } else if (!webpackConfig.module.rules) {
+    webpackConfig.module.rules = rules;
+  }
+
+  rules.push(i18nRule);
 
   // Add a plugin to inject the i18n diagnostics
   // tslint:disable-next-line: no-non-null-assertion
@@ -396,9 +350,9 @@ async function setupLocalize(
           }
           for (const diagnostic of diagnostics.messages) {
             if (diagnostic.type === 'error') {
-              compilation.errors.push(diagnostic.message);
+              addError(compilation, diagnostic.message);
             } else {
-              compilation.warnings.push(diagnostic.message);
+              addWarning(compilation, diagnostic.message);
             }
           }
           diagnostics.messages.length = 0;
@@ -540,6 +494,7 @@ export function buildServePath(
  * @private
  */
 function _addLiveReload(
+  root: string,
   options: DevServerBuilderOptions,
   browserOptions: BrowserBuilderSchema,
   webpackConfig: webpack.Configuration,
@@ -550,19 +505,39 @@ function _addLiveReload(
     webpackConfig.plugins = [];
   }
 
-  // Enable the internal node plugins but no individual shims
-  // This is needed to allow module specific rules to include node shims
+  // Workaround node shim hoisting issues with live reload client
   // Only needed in dev server mode to support live reload capabilities in all package managers
-  if (webpackConfig.node === false) {
-    webpackConfig.node = {
-      global: false,
-      process: false,
-      __filename: false,
-      __dirname: false,
-      Buffer: false,
-      setImmediate: false,
-    };
+  const webpackPath = path.dirname(require.resolve('webpack/package.json'));
+  const nodeLibsBrowserPath = require.resolve('node-libs-browser', { paths: [webpackPath] });
+  const nodeLibsBrowser = require(nodeLibsBrowserPath);
+  webpackConfig.plugins.push(
+    new webpack.NormalModuleReplacementPlugin(
+      /^events|url|querystring$/,
+      (resource: { issuer?: string; request: string }) => {
+        if (!resource.issuer) {
+          return;
+        }
+        if (/[\/\\]hot[\/\\]emitter\.js$/.test(resource.issuer)) {
+          if (resource.request === 'events') {
+            resource.request = nodeLibsBrowser.events;
+          }
+        } else if (
+          /[\/\\]webpack-dev-server[\/\\]client[\/\\]utils[\/\\]createSocketUrl\.js$/.test(
+            resource.issuer,
+          )
+        ) {
+          switch (resource.request) {
+            case 'url':
+              resource.request = nodeLibsBrowser.url;
+              break;
+            case 'querystring':
+              resource.request = nodeLibsBrowser.querystring;
+              break;
+          }
   }
+      },
+    ),
+  );
 
   // This allows for live reload of page when changes are made to repo.
   // https://webpack.js.org/configuration/dev-server/#devserver-inline
@@ -579,37 +554,35 @@ function _addLiveReload(
   if (clientAddress.pathname) {
     clientAddress.pathname = path.posix.join(clientAddress.pathname, 'sockjs-node');
     sockjsPath = '&sockPath=' + clientAddress.pathname;
-    // ensure webpack-dev-server uses the correct path to connect to the reloading socket
-    if (webpackConfig.devServer) {
-      webpackConfig.devServer.sockPath = clientAddress.pathname;
-    }
   }
 
   const entryPoints = [`${webpackDevServerPath}?${url.format(clientAddress)}${sockjsPath}`];
   if (options.hmr) {
     const webpackHmrLink = 'https://webpack.js.org/guides/hot-module-replacement';
-
     logger.warn(tags.oneLine`NOTICE: Hot Module Replacement (HMR) is enabled for the dev server.`);
 
     const showWarning = options.hmrWarning;
     if (showWarning) {
       logger.info(tags.stripIndents`
-          The project will still live reload when HMR is enabled,
-          but to take advantage of HMR additional application code is required'
-          (not included in an Angular CLI project by default).'
-          See ${webpackHmrLink}
-          for information on working with HMR for Webpack.`);
+          The project will still live reload when HMR is enabled, but to take full advantage of HMR
+          additional application code which is not included by default in an Angular CLI project is required.
+
+          See ${webpackHmrLink} for information on working with HMR for Webpack.`);
       logger.warn(
         tags.oneLine`To disable this warning use "hmrWarning: false" under "serve"
            options in "angular.json".`,
       );
     }
     entryPoints.push('webpack/hot/dev-server');
-    webpackConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
-    if (browserOptions.extractCss) {
-      logger.warn(tags.oneLine`NOTICE: (HMR) does not allow for CSS hot reload
-                when used together with '--extract-css'.`);
+    if (browserOptions.styles?.length) {
+      // When HMR is enabled we need to add the css paths as part of the entrypoints
+      // because otherwise no JS bundle will contain the HMR accept code.
+      const normalizedStyles = normalizeExtraEntryPoints(browserOptions.styles, 'styles')
+        .map(style => path.resolve(root, style.input));
+      entryPoints.push(...normalizedStyles);
     }
+
+    webpackConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
   }
   if (typeof webpackConfig.entry !== 'object' || Array.isArray(webpackConfig.entry)) {
     webpackConfig.entry = {};

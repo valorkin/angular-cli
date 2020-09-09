@@ -27,7 +27,8 @@ export function ngcLoader(this: loader.LoaderContext) {
 
   time(timeLabel);
 
-  const plugin = this._compilation._ngToolsWebpackPluginInstance;
+  const plugin = (this._compilation as { _ngToolsWebpackPluginInstance?: AngularCompilerPlugin })
+    ._ngToolsWebpackPluginInstance;
   if (!plugin) {
     throw new Error('The AngularCompilerPlugin was not found. '
                   + 'The @ngtools/webpack loader requires the plugin.');
@@ -96,8 +97,9 @@ export function ngcLoader(this: loader.LoaderContext) {
       const ngStyleRe = /(?:\.shim)?\.ngstyle\.js$/;
       if (ngStyleRe.test(sourceFileName)) {
         const styleFile = sourceFileName.replace(ngStyleRe, '');
-        const styleDependencies = plugin.getResourceDependencies(styleFile);
-        styleDependencies.forEach(dep => this.addDependency(dep));
+        for (const dep of plugin.getResourceDependencies(styleFile)) {
+          this.addDependency(dep);
+        }
       }
 
       // Add type-only dependencies that should trigger a rebuild when they change.

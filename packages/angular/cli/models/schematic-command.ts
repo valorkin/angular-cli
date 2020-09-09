@@ -53,6 +53,7 @@ export interface BaseSchematicSchema {
   force?: boolean;
   interactive?: boolean;
   defaults?: boolean;
+  packageRegistry?: string;
 }
 
 export interface RunSchematicOptions extends BaseSchematicSchema {
@@ -73,10 +74,9 @@ export abstract class SchematicCommand<
   T extends BaseSchematicSchema & BaseCommandOptions
 > extends Command<T> {
   readonly allowPrivateSchematics: boolean = false;
-  readonly allowAdditionalArgs: boolean = false;
   private _host = new NodeJsSyncHost();
-  private _workspace: workspaces.WorkspaceDefinition;
-  protected _workflow: NodeWorkflow;
+  private _workspace: workspaces.WorkspaceDefinition | undefined;
+  protected _workflow!: NodeWorkflow;
 
   protected defaultCollectionName = '@schematics/angular';
   protected collectionName = this.defaultCollectionName;
@@ -110,8 +110,8 @@ export abstract class SchematicCommand<
     }
   }
 
-  public async printHelp(options: T & Arguments) {
-    await super.printHelp(options);
+  public async printHelp() {
+    await super.printHelp();
     this.logger.info('');
 
     const subCommandOption = this.description.options.filter(x => x.subcommands)[0];
@@ -251,11 +251,12 @@ export abstract class SchematicCommand<
       force,
       dryRun,
       packageManager: await getPackageManager(this.workspace.root),
+      packageRegistry: options.packageRegistry,
       root: normalize(this.workspace.root),
       registry: new schema.CoreSchemaRegistry(formats.standardFormats),
       resolvePaths: !!this.workspace.configFile
         // Workspace
-        ? [process.cwd(), this.workspace.root]
+        ? [process.cwd(), this.workspace.root, __dirname]
         // Global
         : [__dirname, process.cwd()],
     });
@@ -316,10 +317,11 @@ export abstract class SchematicCommand<
     workflow.engineHost.registerOptionsTransform(validateOptionsWithSchema(workflow.registry));
 
     workflow.registry.addSmartDefaultProvider('projectName', getProjectName);
+    workflow.registry.useXDeprecatedProvider(msg => this.logger.warn(msg));
 
     if (options.interactive !== false && isTTY()) {
       workflow.registry.usePromptProvider((definitions: Array<schema.PromptDefinition>) => {
-        const questions: inquirer.Questions = definitions.map(definition => {
+        const questions: inquirer.QuestionCollection = definitions.map(definition => {
           const question: inquirer.Question = {
             name: definition.id,
             message: definition.message,
@@ -336,19 +338,15 @@ export abstract class SchematicCommand<
               question.type = 'confirm';
               break;
             case 'list':
-              question.type = !!definition.multiselect ? 'checkbox' : 'list';
-              question.choices =
-                definition.items &&
-                definition.items.map(item => {
-                  if (typeof item == 'string') {
-                    return item;
-                  } else {
-                    return {
-                      name: item.label,
-                      value: item.value,
-                    };
-                  }
-                });
+              question.type = definition.multiselect ? 'checkbox' : 'list';
+              (question as inquirer.CheckboxQuestion).choices = definition.items?.map(item => {
+                return typeof item == 'string'
+                  ? item
+                  : {
+                    name: item.label,
+                    value: item.value,
+                  };
+              });
               break;
             default:
               question.type = definition.type;
@@ -466,8 +464,10 @@ export abstract class SchematicCommand<
       args = await this.parseArguments(schematicOptions || [], o);
     }
 
-    // ng-add is special because we don't know all possible options at this point
-    if (args['--'] && !this.allowAdditionalArgs) {
+    const allowAdditionalProperties =
+      typeof schematic.description.schemaJson === 'object' && schematic.description.schemaJson.additionalProperties;
+
+    if (args['--'] && !allowAdditionalProperties) {
       args['--'].forEach(additional => {
         this.logger.fatal(`Unknown option: '${additional.split(/=/)[0]}'`);
       });

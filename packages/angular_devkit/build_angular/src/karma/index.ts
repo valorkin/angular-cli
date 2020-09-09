@@ -18,10 +18,7 @@ import {
   getTestConfig,
   getWorkerConfig,
 } from '../angular-cli-files/models/webpack-configs';
-import {
-  SingleTestTransformLoader,
-  SingleTestTransformLoaderOptions,
-} from '../angular-cli-files/plugins/single-test-transform';
+import { SingleTestTransformLoader } from '../angular-cli-files/plugins/single-test-transform';
 import { findTests } from '../angular-cli-files/utilities/find-tests';
 import { Schema as BrowserBuilderOptions } from '../browser/schema';
 import { ExecutionTransformer } from '../transforms';
@@ -104,12 +101,7 @@ export function execute(
           }
 
           // prepend special webpack loader that will transform test.ts
-          if (
-            webpackConfig &&
-            webpackConfig.module &&
-            options.include &&
-            options.include.length > 0
-          ) {
+          if (options.include && options.include.length > 0) {
             const mainFilePath = getSystemPath(
               join(normalize(context.workspaceRoot), options.main),
             );
@@ -123,15 +115,23 @@ export function execute(
               return;
             }
 
-            webpackConfig.module.rules.unshift({
-              test: path => path === mainFilePath,
+            // Get the rules and ensure the Webpack configuration is setup properly
+            const rules = webpackConfig.module?.rules || [];
+            if (!webpackConfig.module) {
+              webpackConfig.module = { rules };
+            } else if (!webpackConfig.module.rules) {
+              webpackConfig.module.rules = rules;
+            }
+
+            rules.unshift({
+              test: mainFilePath,
               use: {
                 // cannot be a simple path as it differs between environments
                 loader: SingleTestTransformLoader,
                 options: {
                   files,
                   logger: context.logger,
-                } as SingleTestTransformLoaderOptions,
+                },
               },
             });
           }

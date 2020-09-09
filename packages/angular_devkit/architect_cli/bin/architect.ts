@@ -84,7 +84,7 @@ async function _executeTarget(
   const targetSpec = { project, target, configuration };
 
   delete argv['help'];
-  delete argv['_'];
+  argv['_'] = [];
 
   const logger = new logging.Logger('jobs');
   const logs: logging.LogEntry[] = [];
@@ -201,6 +201,9 @@ async function main(args: string[]): Promise<number> {
 
   const registry = new schema.CoreSchemaRegistry();
   registry.addPostTransform(schema.transforms.addUndefinedDefaults);
+
+  // Show usage of deprecated options
+  registry.useXDeprecatedProvider(msg => logger.warn(msg));
 
   const { workspace } = await workspaces.readWorkspace(
     configFilePath,

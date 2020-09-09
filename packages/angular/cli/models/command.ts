@@ -5,8 +5,6 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-
-// tslint:disable:no-global-tslint-disable no-any
 import { analytics, logging, strings, tags } from '@angular-devkit/core';
 import * as path from 'path';
 import { colors } from '../utilities/color';
@@ -49,7 +47,7 @@ export abstract class Command<T extends BaseCommandOptions = BaseCommandOptions>
     return;
   }
 
-  async printHelp(options: T & Arguments): Promise<number> {
+  async printHelp(): Promise<number> {
     await this.printHelpUsage();
     await this.printHelpOptions();
 
@@ -175,7 +173,7 @@ export abstract class Command<T extends BaseCommandOptions = BaseCommandOptions>
     await this.initialize(options);
 
     if (options.help === true) {
-      return this.printHelp(options);
+      return this.printHelp();
     } else if (options.help === 'json' || options.help === 'JSON') {
       return this.printJsonHelp(options);
     } else {

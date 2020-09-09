@@ -38,7 +38,7 @@ export function makeTransform(
       // replace_resources), but may not be true for new transforms.
       if (getTypeChecker && removeOps.length + replaceOps.length > 0) {
         const removedNodes = removeOps.concat(replaceOps).map(op => op.target);
-        removeOps.push(...elideImports(sf, removedNodes, getTypeChecker));
+        removeOps.push(...elideImports(sf, removedNodes, getTypeChecker, context.getCompilerOptions()));
       }
 
       const visitor: ts.Visitor = node => {
@@ -99,8 +99,9 @@ export function makeTransform(
 // If TS sees an empty decorator array, it will still emit a `__decorate` call.
 //    This seems to be a TS bug.
 function cleanupDecorators(node: ts.Node) {
-  if (node.decorators && node.decorators.length === 0) {
-    node.decorators = undefined;
+  if (node.decorators?.length === 0) {
+    // tslint:disable-next-line:no-any
+    (node as any).decorators = undefined;
   }
 
   ts.forEachChild(node, node => cleanupDecorators(node));

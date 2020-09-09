@@ -11,7 +11,7 @@ import { logging } from '@angular-devkit/core';
 import { execSync, spawnSync } from 'child_process';
 import * as glob from 'glob';
 import 'jasmine';
-import { SpecReporter as JasmineSpecReporter } from 'jasmine-spec-reporter';
+import { SpecReporter as JasmineSpecReporter, StacktraceOption } from 'jasmine-spec-reporter';
 import { ParsedArgs } from 'minimist';
 import { join, normalize, relative } from 'path';
 import * as ts from 'typescript';
@@ -23,6 +23,7 @@ const knownFlakes = [
   // Rebuild tests in test-large are flakey if not run as the first suite.
   // https://github.com/angular/angular-cli/pull/15204
   'packages/angular_devkit/build_angular/test/browser/rebuild_spec_large.ts',
+  'packages/angular_devkit/build_angular/test/browser/web-worker_spec_large.ts',
 ];
 
 const projectBaseDir = join(__dirname, '..');
@@ -65,7 +66,7 @@ if (process.argv.indexOf('--spec-reporter') != -1) {
         displayNumber: true,
       },
       summary: {
-        displayStacktrace: true,
+        displayStacktrace: StacktraceOption.PRETTY,
         displayErrorMessages: true,
         displayDuration: true,
       },
@@ -86,7 +87,7 @@ glob
   });
 
 export default function(args: ParsedArgs, logger: logging.Logger) {
-  const specGlob = args.large ? '*_spec_large.ts' : '*_spec.ts';
+  const specGlob = '*_spec.ts';
   const regex = args.glob ? args.glob : `packages/**/${specGlob}`;
 
   if (args.large) {

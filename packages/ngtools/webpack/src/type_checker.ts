@@ -13,7 +13,6 @@ import {
   Program,
   createCompilerHost,
   createProgram,
-  formatDiagnostics,
 } from '@angular/compiler-cli';
 import * as ts from 'typescript';
 import { time, timeEnd } from './benchmark';
@@ -29,7 +28,7 @@ import { LogMessage, TypeCheckerMessage } from './type_checker_messages';
 export const AUTO_START_ARG = '9d93e901-158a-4cf9-ba1b-2f0582ffcfeb';
 
 export class TypeChecker {
-  private _program: ts.Program | Program;
+  private _program?: ts.Program | Program;
   private _compilerHost: WebpackCompilerHost & CompilerHost;
 
   constructor(
@@ -104,6 +103,10 @@ export class TypeChecker {
   }
 
   private _diagnose(cancellationToken: CancellationToken) {
+    if (!this._program) {
+      return;
+    }
+
     const allDiagnostics = gatherDiagnostics(
       this._program, this._JitMode, 'TypeChecker', DiagnosticMode.Semantic, cancellationToken);
 
@@ -111,7 +114,6 @@ export class TypeChecker {
     if (!cancellationToken.isCancellationRequested()) {
       reportDiagnostics(
         allDiagnostics,
-        this._compilerHost,
         msg => this.sendMessage(new LogMessage('error', 'ERROR in ' + msg)),
         msg => this.sendMessage(new LogMessage('warn', 'WARNING in ' + msg)),
       );

@@ -11,6 +11,7 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
+import * as rimraf from 'rimraf';
 import { packages } from '../lib/packages';
 import buildSchema from './build-schema';
 
@@ -132,20 +133,10 @@ function _rm(p: string) {
   fs.unlinkSync(p);
 }
 
-
-function _rimraf(p: string) {
-  glob.sync(path.join(p, '**/*'), { dot: true, nodir: true })
-    .forEach(p => fs.unlinkSync(p));
-  glob.sync(path.join(p, '**/*'), { dot: true })
-    .sort((a, b) => b.length - a.length)
-    .forEach(p => fs.rmdirSync(p));
-}
-
-
 function _clean(logger: logging.Logger) {
   logger.info('Cleaning...');
   logger.info('  Removing dist/...');
-  _rimraf(path.join(__dirname, '../dist'));
+  rimraf.sync(path.join(__dirname, '../dist'));
 }
 
 
@@ -205,12 +196,6 @@ function _build(logger: logging.Logger) {
 }
 
 
-async function _bazel(logger: logging.Logger) {
-  // TODO: undo this when we fully support bazel on windows.
-  // logger.info('Bazel build...');
-  // _exec('bazel', ['build', '//packages/...'], {}, logger);
-}
-
 // tslint:disable-next-line:no-big-function
 export default async function(
   argv: { local?: boolean, snapshot?: boolean },
@@ -219,7 +204,6 @@ export default async function(
   _clean(logger);
 
   const sortedPackages = _sortPackages();
-  await _bazel(logger);
   await buildSchema({}, logger);
   _build(logger);
 
@@ -229,7 +213,7 @@ export default async function(
     packageLogger.info(packageName);
     const pkg = packages[packageName];
     _recursiveCopy(pkg.build, pkg.dist, logger);
-    _rimraf(pkg.build);
+    rimraf.sync(pkg.build);
   }
 
   logger.info('Merging bazel-bin/ with dist/');
@@ -241,7 +225,7 @@ export default async function(
     if (fs.existsSync(bazelBinPath)) {
       packageLogger.info(packageName);
       _recursiveCopy(bazelBinPath, pkg.dist, logger);
-      _rimraf(bazelBinPath);
+      rimraf.sync(bazelBinPath);
     }
   }
 
@@ -269,6 +253,11 @@ export default async function(
 
         if (fileName.endsWith('package.json')) {
           return true;
+        }
+
+        // Ignore in package test files.
+        if (fileName.startsWith('test/') || fileName.startsWith('test\\')) {
+          return false;
         }
 
         // Remove Bazel files from NPM.

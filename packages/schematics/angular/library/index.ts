@@ -55,7 +55,7 @@ function updateJsonFile<T>(host: Tree, path: string, callback: UpdateJsonFn<T>):
   return host;
 }
 
-function updateTsConfig(packageName: string, distRoot: string) {
+function updateTsConfig(packageName: string, ...paths: string[]) {
 
   return (host: Tree) => {
     if (!host.exists('tsconfig.json')) { return host; }
@@ -67,24 +67,18 @@ function updateTsConfig(packageName: string, distRoot: string) {
       if (!tsconfig.compilerOptions.paths[packageName]) {
         tsconfig.compilerOptions.paths[packageName] = [];
       }
-      tsconfig.compilerOptions.paths[packageName].push(distRoot);
+      tsconfig.compilerOptions.paths[packageName].push(...paths);
     });
   };
 }
 
 function addDependenciesToPackageJson() {
-
   return (host: Tree) => {
     [
       {
         type: NodeDependencyType.Dev,
         name: '@angular/compiler-cli',
         version: latestVersions.Angular,
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: '@angular-devkit/build-ng-packagr',
-        version: latestVersions.DevkitBuildNgPackagr,
       },
       {
         type: NodeDependencyType.Dev,
@@ -192,6 +186,7 @@ export default function (options: LibraryOptions): Rule {
     const folderName = `${scopeFolder}${strings.dasherize(options.name)}`;
     const projectRoot = join(normalize(newProjectRoot), folderName);
     const distRoot = `dist/${folderName}`;
+    const pathImportLib = `${distRoot}/${folderName.replace('/', '-')}`;
     const sourceDir = `${projectRoot}/src/lib`;
 
     const templateSource = apply(url('./files'), [
@@ -214,7 +209,7 @@ export default function (options: LibraryOptions): Rule {
       mergeWith(templateSource),
       addLibToWorkspaceFile(options, projectRoot, projectName),
       options.skipPackageJson ? noop() : addDependenciesToPackageJson(),
-      options.skipTsConfig ? noop() : updateTsConfig(packageName, distRoot),
+      options.skipTsConfig ? noop() : updateTsConfig(packageName, pathImportLib, distRoot),
       schematic('module', {
         name: options.name,
         commonModule: false,

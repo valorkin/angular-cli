@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import * as fs from 'fs';
+import * as path from 'path';
 import { Observable, concat, from as observableFrom, of, throwError } from 'rxjs';
 import {
   concatMap,
@@ -159,8 +160,8 @@ export class NodeJsAsyncHost implements virtualFs.Host<fs.Stats> {
   }
 
   list(path: Path): Observable<PathFragment[]> {
-    return _callFs(fs.readdir, getSystemPath(path)).pipe(
-      map((names: string[]) => names.map(name => fragment(name))),
+    return _callFs<string[], string>(fs.readdir, getSystemPath(path)).pipe(
+      map((names) => names.map(name => fragment(name))),
     );
   }
 
@@ -316,6 +317,10 @@ export class NodeJsSyncHost implements virtualFs.Host<fs.Stats> {
       // TODO: remove this try+catch when issue https://github.com/ReactiveX/rxjs/issues/3740 is
       // fixed.
       try {
+        const toSystemPath = getSystemPath(to);
+        if (!fs.existsSync(path.dirname(toSystemPath))) {
+            fs.mkdirSync(path.dirname(toSystemPath), { recursive: true });
+        }
         fs.renameSync(getSystemPath(from), getSystemPath(to));
         obs.next();
         obs.complete();

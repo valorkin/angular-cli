@@ -22,10 +22,12 @@ export function getEmittedFiles(compilation: webpack.compilation.Compilation): E
   const files: EmittedFiles[] = [];
 
   // adds all chunks to the list of emitted files such as lazy loaded modules
-  for (const chunk of compilation.chunks as webpack.compilation.Chunk[]) {
-    for (const file of chunk.files as string[]) {
+  for (const chunk of compilation.chunks as Iterable<webpack.compilation.Chunk>) {
+    for (const file of chunk.files) {
       files.push({
-        id: chunk.id.toString(),
+        // The id is guaranteed to exist at this point in the compilation process
+        // tslint:disable-next-line: no-non-null-assertion
+        id: chunk.id!.toString(),
         name: chunk.name,
         file,
         extension: path.extname(file),

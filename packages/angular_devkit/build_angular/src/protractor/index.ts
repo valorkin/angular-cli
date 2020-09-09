@@ -17,12 +17,22 @@ import * as url from 'url';
 import { runModuleAsObservableFork } from '../utils';
 import { Schema as ProtractorBuilderOptions } from './schema';
 
+interface JasmineNodeOpts {
+  jasmineNodeOpts: {
+    grep?: string;
+    invertGrep?: boolean;
+  };
+}
+
 function runProtractor(root: string, options: ProtractorBuilderOptions): Promise<BuilderOutput> {
-  const additionalProtractorConfig: Partial<ProtractorBuilderOptions> = {
-    elementExplorer: options.elementExplorer,
+  const additionalProtractorConfig: Partial<ProtractorBuilderOptions> & Partial<JasmineNodeOpts> = {
     baseUrl: options.baseUrl,
     specs: options.specs && options.specs.length ? options.specs : undefined,
     suite: options.suite,
+    jasmineNodeOpts: {
+      grep: options.grep,
+      invertGrep: options.invertGrep,
+    },
   };
 
   // TODO: Protractor manages process.exit itself, so this target will allways quit the
@@ -39,21 +49,15 @@ function runProtractor(root: string, options: ProtractorBuilderOptions): Promise
 async function updateWebdriver() {
   // The webdriver-manager update command can only be accessed via a deep import.
   const webdriverDeepImport = 'webdriver-manager/built/lib/cmds/update';
-  const importOptions = [
-    // When using npm, webdriver is within protractor/node_modules.
-    `protractor/node_modules/${webdriverDeepImport}`,
-    // When using yarn, webdriver is found as a root module.
-    webdriverDeepImport,
-  ];
 
   let path;
-  for (const importOption of importOptions) {
-    try {
-      path = require.resolve(importOption);
-    } catch (error) {
-      if (error.code !== 'MODULE_NOT_FOUND') {
-        throw error;
-      }
+  try {
+    const protractorPath = require.resolve('protractor');
+
+    path = require.resolve(webdriverDeepImport, { paths: [protractorPath] });
+  } catch (error) {
+    if (error.code !== 'MODULE_NOT_FOUND') {
+      throw error;
     }
   }
 
@@ -65,7 +69,8 @@ async function updateWebdriver() {
   }
 
   // tslint:disable-next-line:max-line-length no-implicit-dependencies
-  const webdriverUpdate = await import(path) as typeof import ('webdriver-manager/built/lib/cmds/update');
+  const webdriverUpdate = await import(path);
+  // const webdriverUpdate = await import(path) as typeof import ('webdriver-manager/built/lib/cmds/update');
 
   // run `webdriver-manager update --standalone false --gecko false --quiet`
   // if you change this, update the command comment in prev line

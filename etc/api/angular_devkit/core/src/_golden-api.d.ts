@@ -9,7 +9,7 @@ export declare function addUndefinedDefaults(value: JsonValue, _pointer: JsonPoi
 
 export declare class AliasHost<StatsT extends object = {}> extends ResolverHost<StatsT> {
     protected _aliases: Map<Path, Path>;
-    readonly aliases: Map<Path, Path>;
+    get aliases(): Map<Path, Path>;
     protected _resolve(path: Path): Path;
 }
 
@@ -162,8 +162,8 @@ export declare class CordHost extends SimpleMemoryHost {
     protected _filesToOverwrite: Set<Path>;
     protected _filesToRename: Map<Path, Path>;
     protected _filesToRenameRevert: Map<Path, Path>;
-    readonly backend: ReadonlyHost;
-    readonly capabilities: HostCapabilities;
+    get backend(): ReadonlyHost;
+    get capabilities(): HostCapabilities;
     constructor(_back: ReadonlyHost);
     clone(): CordHost;
     commit(host: Host, force?: boolean): Observable<void>;
@@ -214,7 +214,7 @@ export interface CordHostRename {
 
 export declare class CoreSchemaRegistry implements SchemaRegistry {
     constructor(formats?: SchemaFormat[]);
-    protected _resolver(ref: string, validate: ajv.ValidateFunction): {
+    protected _resolver(ref: string, validate?: ajv.ValidateFunction): {
         context?: ajv.ValidateFunction;
         schema?: JsonObject;
     };
@@ -226,7 +226,10 @@ export declare class CoreSchemaRegistry implements SchemaRegistry {
     flatten(schema: JsonObject): Observable<JsonObject>;
     registerUriHandler(handler: UriHandler): void;
     usePromptProvider(provider: PromptProvider): void;
+    useXDeprecatedProvider(onUsage: (message: string) => void): void;
 }
+
+export declare function createSyncHost<StatsT extends object = {}>(handler: SyncHostHandler<StatsT>): Host<StatsT>;
 
 export declare function createWorkspaceHost(host: virtualFs.Host): WorkspaceHost;
 
@@ -538,7 +541,8 @@ export interface LogEntry extends LoggerMetadata {
 
 export declare class Logger extends Observable<LogEntry> implements LoggerApi {
     protected _metadata: LoggerMetadata;
-    protected _observable: Observable<LogEntry>;
+    protected get _observable(): Observable<LogEntry>;
+    protected set _observable(v: Observable<LogEntry>);
     protected readonly _subject: Subject<LogEntry>;
     readonly name: string;
     readonly parent: Logger | null;
@@ -687,8 +691,8 @@ export interface ParseJsonOptions {
 export declare function parseJsonPointer(pointer: JsonPointer): string[];
 
 export declare class PartiallyOrderedSet<T> implements Set<T> {
-    readonly [Symbol.toStringTag]: 'Set';
-    readonly size: number;
+    get [Symbol.toStringTag](): 'Set';
+    get size(): number;
     [Symbol.iterator](): Generator<T, void, unknown>;
     protected _checkCircularDependencies(item: T, deps: Set<T>): void;
     add(item: T, deps?: (Set<T> | T[])): this;
@@ -750,7 +754,7 @@ export declare type PosixPath = string & {
 };
 
 export declare class PriorityQueue<T> {
-    readonly size: number;
+    get size(): number;
     constructor(_comparator: (x: T, y: T) => number);
     clear(): void;
     peek(): T | undefined;
@@ -855,7 +859,7 @@ export declare function resolve(p1: Path, p2: Path): Path;
 
 export declare abstract class ResolverHost<T extends object> implements Host<T> {
     protected _delegate: Host<T>;
-    readonly capabilities: HostCapabilities;
+    get capabilities(): HostCapabilities;
     constructor(_delegate: Host<T>);
     protected abstract _resolve(path: Path): Path;
     delete(path: Path): Observable<void>;
@@ -871,7 +875,7 @@ export declare abstract class ResolverHost<T extends object> implements Host<T> 
 }
 
 export declare class SafeReadonlyHost<StatsT extends object = {}> implements ReadonlyHost<StatsT> {
-    readonly capabilities: HostCapabilities;
+    get capabilities(): HostCapabilities;
     constructor(_delegate: ReadonlyHost<StatsT>);
     exists(path: Path): Observable<boolean>;
     isDirectory(path: Path): Observable<boolean>;
@@ -903,6 +907,7 @@ export interface SchemaRegistry {
     compile(schema: Object): Observable<SchemaValidator>;
     flatten(schema: JsonObject | string): Observable<JsonObject>;
     usePromptProvider(provider: PromptProvider): void;
+    useXDeprecatedProvider(onUsage: (message: string) => void): void;
 }
 
 export declare class SchemaValidationException extends BaseException {
@@ -950,7 +955,7 @@ export interface ScreenviewOptions extends CustomDimensionsAndMetricsOptions {
 
 export declare class SimpleMemoryHost implements Host<{}> {
     protected _cache: Map<Path, Stats<SimpleMemoryHostStats>>;
-    readonly capabilities: HostCapabilities;
+    get capabilities(): HostCapabilities;
     constructor();
     protected _delete(path: Path): void;
     protected _exists(path: Path): boolean;
@@ -1029,8 +1034,8 @@ export declare function stripIndents(strings: TemplateStringsArray, ...values: a
 
 export declare class SyncDelegateHost<T extends object = {}> {
     protected _delegate: Host<T>;
-    readonly capabilities: HostCapabilities;
-    readonly delegate: Host<T>;
+    get capabilities(): HostCapabilities;
+    get delegate(): Host<T>;
     constructor(_delegate: Host<T>);
     protected _doSyncCall<ResultT>(observable: Observable<ResultT>): ResultT;
     delete(path: Path): void;
@@ -1042,6 +1047,18 @@ export declare class SyncDelegateHost<T extends object = {}> {
     rename(from: Path, to: Path): void;
     stat(path: Path): Stats<T> | null;
     watch(path: Path, options?: HostWatchOptions): Observable<HostWatchEvent> | null;
+    write(path: Path, content: FileBufferLike): void;
+}
+
+export interface SyncHostHandler<StatsT extends object = {}> {
+    delete(path: Path): void;
+    exists(path: Path): boolean;
+    isDirectory(path: Path): boolean;
+    isFile(path: Path): boolean;
+    list(path: Path): PathFragment[];
+    read(path: Path): FileBuffer;
+    rename(from: Path, to: Path): void;
+    stat(path: Path): Stats<StatsT> | null;
     write(path: Path, content: FileBufferLike): void;
 }
 
@@ -1130,10 +1147,10 @@ export declare namespace test {
     };
     class TestHost extends SimpleMemoryHost {
         protected _records: TestLogRecord[];
-        protected _sync: SyncDelegateHost<{}>;
-        readonly files: Path[];
-        readonly records: TestLogRecord[];
-        readonly sync: SyncDelegateHost<{}>;
+        protected _sync: SyncDelegateHost<{}> | null;
+        get files(): Path[];
+        get records(): TestLogRecord[];
+        get sync(): SyncDelegateHost<{}>;
         constructor(map?: {
             [path: string]: string;
         });
@@ -1201,10 +1218,10 @@ export declare type WindowsPath = string & {
 };
 
 export declare class Workspace {
-    readonly host: virtualFs.Host<{}>;
-    readonly newProjectRoot: string | undefined;
-    readonly root: Path;
-    readonly version: number;
+    get host(): virtualFs.Host<{}>;
+    get newProjectRoot(): string | undefined;
+    get root(): Path;
+    get version(): number;
     constructor(_root: Path, _host: virtualFs.Host<{}>, registry?: schema.CoreSchemaRegistry);
     getCli(): WorkspaceTool;
     getDefaultProjectName(): string | null;

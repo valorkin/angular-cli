@@ -7,6 +7,7 @@
  */
 import { strings } from '@angular-devkit/core';
 import {
+  FileOperator,
   Rule,
   SchematicsException,
   Tree,
@@ -14,6 +15,7 @@ import {
   applyTemplates,
   chain,
   filter,
+  forEach,
   mergeWith,
   move,
   noop,
@@ -31,7 +33,7 @@ import { applyLintFix } from '../utility/lint-fix';
 import { parseName } from '../utility/parse-name';
 import { validateHtmlSelector, validateName } from '../utility/validation';
 import { buildDefaultPath, getWorkspace } from '../utility/workspace';
-import { Schema as ComponentOptions, Style } from './schema';
+import { Schema as ComponentOptions } from './schema';
 
 function readIntoSourceFile(host: Tree, modulePath: string): ts.SourceFile {
   const text = host.read(modulePath);
@@ -49,7 +51,7 @@ function addDeclarationToNgModule(options: ComponentOptions): Rule {
       return host;
     }
 
-    options.type = !!options.type ? options.type : 'Component';
+    options.type = options.type != null ? options.type : 'Component';
 
     const modulePath = options.module;
     const source = readIntoSourceFile(host, modulePath);
@@ -57,7 +59,7 @@ function addDeclarationToNgModule(options: ComponentOptions): Rule {
     const componentPath = `/${options.path}/`
                           + (options.flat ? '' : strings.dasherize(options.name) + '/')
                           + strings.dasherize(options.name)
-                          + '.'
+                          + (options.type ? '.' : '')
                           + strings.dasherize(options.type);
     const relativePath = buildRelativePath(modulePath, componentPath);
     const classifiedName = strings.classify(options.name) + strings.classify(options.type);
@@ -155,6 +157,16 @@ export default function (options: ComponentOptions): Rule {
         'if-flat': (s: string) => options.flat ? '' : s,
         ...options,
       }),
+      !options.type ? forEach((file => {
+        if (!!file.path.match(new RegExp('..'))) {
+          return {
+            content: file.content,
+            path: file.path.replace('..', '.'),
+          };
+        } else {
+          return file;
+        }
+      }) as FileOperator) : noop(),
       move(parsedPath.path),
     ]);
 

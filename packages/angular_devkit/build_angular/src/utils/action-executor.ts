@@ -12,6 +12,7 @@ import * as v8 from 'v8';
 import { BundleActionCache } from './action-cache';
 import { I18nOptions } from './i18n-options';
 import { InlineOptions, ProcessBundleOptions, ProcessBundleResult } from './process-bundle';
+import { maxWorkers } from './workers';
 
 const hasThreadSupport = (() => {
   try {
@@ -62,6 +63,7 @@ export class BundleActionExecutor {
     return (this.largeWorker = new JestWorker(workerFile, {
       exposedMethods: ['process', 'inlineLocales'],
       setupArgs: [[...serialize(this.workerOptions)]],
+      numWorkers: maxWorkers,
     }));
   }
 
@@ -143,10 +145,14 @@ export class BundleActionExecutor {
   }
 
   stop(): void {
+    // Floating promises are intentional here
+    // https://github.com/facebook/jest/tree/56079a5aceacf32333089cea50c64385885fee26/packages/jest-worker#end
     if (this.largeWorker) {
+      // tslint:disable-next-line: no-floating-promises
       this.largeWorker.end();
     }
     if (this.smallWorker) {
+      // tslint:disable-next-line: no-floating-promises
       this.smallWorker.end();
     }
   }

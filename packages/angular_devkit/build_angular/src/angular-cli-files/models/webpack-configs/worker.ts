@@ -10,30 +10,24 @@ import { Configuration } from 'webpack';
 import { WebpackConfigOptions } from '../build-options';
 import { getTypescriptWorkerPlugin } from './typescript';
 
-// const WorkerPlugin = require('worker-plugin');
-
-
 export function getWorkerConfig(wco: WebpackConfigOptions): Configuration {
-  return {};
+  const { buildOptions } = wco;
+
+  if (!buildOptions.webWorkerTsConfig) {
+    return {};
+  }
+
+  if (typeof buildOptions.webWorkerTsConfig != 'string') {
+    throw new Error('The `webWorkerTsConfig` must be a string.');
+  }
+
+  const workerTsConfigPath = resolve(wco.root, buildOptions.webWorkerTsConfig);
+  const WorkerPlugin = require('worker-plugin');
+
+  return {
+    plugins: [new WorkerPlugin({
+      globalObject: false,
+      plugins: [getTypescriptWorkerPlugin(wco, workerTsConfigPath)],
+    })],
+  };
 }
-  // const { buildOptions } = wco;
-
-  // return ;
-
-  // if (!buildOptions.webWorkerTsConfig) {
-  //   return {};
-  // }
-
-  // if (typeof buildOptions.webWorkerTsConfig != 'string') {
-  //   throw new Error('The `webWorkerTsConfig` must be a string.');
-  // }
-
-  // const workerTsConfigPath = resolve(wco.root, buildOptions.webWorkerTsConfig);
-
-  // return {
-  //   plugins: [new WorkerPlugin({
-  //     globalObject: false,
-  //     plugins: [getTypescriptWorkerPlugin(wco, workerTsConfigPath)],
-  //   })],
-  // };
-//}

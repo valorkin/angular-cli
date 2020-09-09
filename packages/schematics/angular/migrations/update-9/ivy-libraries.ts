@@ -5,6 +5,8 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
+import { join, normalize } from '@angular-devkit/core';
 import { Rule, Tree } from '@angular-devkit/schematics';
 import { getWorkspacePath } from '../../utility/config';
 import {
@@ -29,14 +31,14 @@ export function updateLibraries(): Rule {
     const workspace = getWorkspace(tree);
 
     const recorder = tree.beginUpdate(workspacePath);
-    for (const { target, project } of getTargets(workspace, 'build', Builders.NgPackagr)) {
+    for (const { target, project } of getTargets(workspace, 'build', Builders.DeprecatedNgPackagr)) {
       const projectRoot = findPropertyInAstObject(project, 'root');
       if (!projectRoot || projectRoot.kind !== 'string') {
         break;
       }
 
       const configurations = findPropertyInAstObject(target, 'configurations');
-      const tsConfig = `${projectRoot.value}/tsconfig.lib.prod.json`;
+      const tsConfig = join(normalize(projectRoot.value), 'tsconfig.lib.prod.json');
 
       if (!configurations || configurations.kind !== 'object') {
         // Configurations doesn't exist.

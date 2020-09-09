@@ -7,6 +7,7 @@
  */
 import * as ajv from 'ajv';
 import * as http from 'http';
+import * as https from 'https';
 import { Observable, from, isObservable, of, throwError } from 'rxjs';
 import { concatMap, map, switchMap, tap } from 'rxjs/operators';
 import * as Url from 'url';
@@ -57,6 +58,7 @@ export class SchemaValidationException extends BaseException {
   ) {
     if (!errors || errors.length === 0) {
       super('Schema validation failed.');
+      this.errors = [];
 
       return;
     }
@@ -144,7 +146,9 @@ export class CoreSchemaRegistry implements SchemaRegistry {
 
     // If none are found, handle using http client.
     return new Promise<JsonObject>((resolve, reject) => {
-      http.get(uri, res => {
+      const url = new Url.URL(uri);
+      const client = url.protocol === 'https:' ? https : http;
+      client.get(url, res => {
         if (!res.statusCode || res.statusCode >= 300) {
           // Consume the rest of the data to free memory.
           res.resume();
@@ -191,7 +195,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
 
   protected _resolver(
     ref: string,
-    validate: ajv.ValidateFunction,
+    validate?: ajv.ValidateFunction,
   ): { context?: ajv.ValidateFunction, schema?: JsonObject } {
     if (!validate || !validate.refs || !validate.refVal || !ref) {
       return {};
@@ -393,10 +397,10 @@ export class CoreSchemaRegistry implements SchemaRegistry {
             switchMap(updatedData => {
               const result = validate.call(validationContext, updatedData);
 
-              return typeof result == 'boolean'
+              return typeof result === 'boolean'
                 ? of([updatedData, result])
                 : from((result as Promise<boolean>)
-                  .then(r => [updatedData, true])
+                  .then(() => [updatedData, true])
                   .catch((err: Error | AjvValidationError) => {
                     if ((err as AjvValidationError).ajv) {
                       validate.errors = (err as AjvValidationError).errors;
@@ -407,7 +411,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
                     return Promise.reject(err);
                   }));
             }),
-            switchMap(([data, valid]: [JsonValue, boolean]) => {
+            switchMap(([data, valid]) => {
               if (valid) {
                 let result = of(data);
 
@@ -427,7 +431,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
                 return of([data, valid]);
               }
             }),
-            map(([data, valid]: [JsonValue, boolean]) => {
+            map(([data, valid]) => {
               if (valid) {
                 return { data, success: true } as SchemaValidatorResult;
               }
@@ -444,8 +448,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
   }
 
   addFormat(format: SchemaFormat): void {
-    // tslint:disable-next-line:no-any
-    const validate = (data: any) => {
+    const validate = (data: unknown) => {
       const result = format.formatter.validate(data);
 
       if (typeof result == 'boolean') {
@@ -458,9 +461,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
     this._ajv.addFormat(format.name, {
       async: format.formatter.async,
       validate,
-    // AJV typings list `compare` as required, but it is optional.
-    // tslint:disable-next-line:no-any
-    } as any);
+    });
   }
 
   addSmartDefaultProvider<T>(source: string, provider: SmartDefaultProvider<T>) {
@@ -519,7 +520,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
     this._ajv.addKeyword('x-prompt', {
       errors: false,
       valid: true,
-      compile: (schema, parentSchema: JsonObject, it) => {
+      compile: (schema, parentSchema, it) => {
         const compilationSchemInfo = this._currentCompilationSchemaInfo;
         if (!compilationSchemInfo) {
           return () => true;
@@ -540,17 +541,17 @@ export class CoreSchemaRegistry implements SchemaRegistry {
           items = schema.items;
         }
 
-        const propertyTypes = getTypesOfSchema(parentSchema);
+        const propertyTypes = getTypesOfSchema(parentSchema as JsonObject);
         if (!type) {
           if (propertyTypes.size === 1 && propertyTypes.has('boolean')) {
             type = 'confirmation';
-          } else if (Array.isArray(parentSchema.enum)) {
+          } else if (Array.isArray((parentSchema as JsonObject).enum)) {
             type = 'list';
           } else if (
             propertyTypes.size === 1 &&
             propertyTypes.has('array') &&
-            parentSchema.items &&
-            Array.isArray((parentSchema.items as JsonObject).enum)
+            (parentSchema as JsonObject).items &&
+            Array.isArray(((parentSchema as JsonObject).items as JsonObject).enum)
           ) {
             type = 'list';
           } else {
@@ -566,8 +567,8 @@ export class CoreSchemaRegistry implements SchemaRegistry {
               : schema.multiselect;
 
           const enumValues = multiselect
-            ? parentSchema.items && (parentSchema.items as JsonObject).enum
-            : parentSchema.enum;
+            ? (parentSchema as JsonObject).items && ((parentSchema as JsonObject).items as JsonObject).enum
+            : (parentSchema as JsonObject).enum;
           if (!items && Array.isArray(enumValues)) {
             items = [];
             for (const value of enumValues) {
@@ -590,11 +591,11 @@ export class CoreSchemaRegistry implements SchemaRegistry {
           items,
           multiselect,
           default:
-            typeof parentSchema.default == 'object' &&
-            parentSchema.default !== null &&
-            !Array.isArray(parentSchema.default)
+            typeof (parentSchema as JsonObject).default == 'object' &&
+            (parentSchema as JsonObject).default !== null &&
+            !Array.isArray((parentSchema as JsonObject).default)
               ? undefined
-              : parentSchema.default as string[],
+              : (parentSchema as JsonObject).default as string[],
           async validator(data: JsonValue) {
             try {
               return await it.self.validate(parentSchema, data);
@@ -751,5 +752,18 @@ export class CoreSchemaRegistry implements SchemaRegistry {
         });
       }),
     );
+  }
+
+  useXDeprecatedProvider(onUsage: (message: string) => void): void {
+    this._ajv.addKeyword('x-deprecated', {
+      validate: (schema, _data, _parentSchema, _dataPath, _parentDataObject, propertyName) => {
+        if (schema) {
+          onUsage(`Option "${propertyName}" is deprecated${typeof schema == 'string' ? ': ' + schema : '.'}`);
+        }
+
+        return true;
+      },
+      errors: false,
+    });
   }
 }

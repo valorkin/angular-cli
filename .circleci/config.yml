@@ -9,28 +9,28 @@
 
 version: 2.1
 
+orbs:
+  browser-tools: circleci/browser-tools@1.0.1
+
 # Variables
 
 ## IMPORTANT
-# If you change the cache key prefix, also sync the fallback_cache_key fallback to match.
-# Keep the static part of the cache key as prefix to enable correct fallbacks.
 # Windows needs its own cache key because binaries in node_modules are different.
 # See https://circleci.com/docs/2.0/caching/#restoring-cache for how prefixes work in CircleCI.
-var_1: &cache_key angular_devkit-0.12.0-{{ checksum "yarn.lock" }}
-var_2: &cache_key_fallback angular_devkit-0.12.0
-var_1_win: &cache_key_win angular_devkit-win-0.12.0-{{ checksum "yarn.lock" }}
-var_2_win: &cache_key_fallback_win angular_devkit-win-0.12.0
-var_3: &default_nodeversion "12.9"
+var_1: &cache_key angular_devkit-12.18-{{ checksum "yarn.lock" }}
+var_1_win: &cache_key_win angular_devkit-win-12.18-{{ checksum "yarn.lock" }}
+var_3: &default_nodeversion "12.18"
 # Workspace initially persisted by the `setup` job, and then enhanced by `setup-and-build-win`.
 # https://circleci.com/docs/2.0/workflows/#using-workspaces-to-share-data-among-jobs
 # https://circleci.com/blog/deep-diving-into-circleci-workspaces/
 var_4: &workspace_location .
-# Filter to ignore pull requests on a given job.
-var_5: &ignore_pull_requests
+# Filter to only release branches on a given job.
+var_5: &only_release_branches
   filters:
     branches:
-      ignore:
-        - /pull\/.*/
+      only:
+        - master
+        - /\d+\.\d+\.x/
 
 # Executor Definitions
 # https://circleci.com/docs/2.0/reusing-config/#authoring-reusable-executors
@@ -41,8 +41,9 @@ executors:
         type: string
         default: *default_nodeversion
     docker:
-      - image: circleci/node:<< parameters.nodeversion >>
+      - image: cimg/node:<< parameters.nodeversion >>
     working_directory: ~/ng
+    resource_class: small
 
   test-executor:
     parameters:
@@ -50,11 +51,11 @@ executors:
         type: string
         default: *default_nodeversion
     docker:
-      - image: circleci/node:<< parameters.nodeversion >>-browsers
+      - image: cimg/node:<< parameters.nodeversion >>
     working_directory: ~/ng
     environment:
       NPM_CONFIG_PREFIX: ~/.npm-global
-    resource_class: xlarge
+    resource_class: large
 
   windows-executor:
     # Same as https://circleci.com/orbs/registry/orb/circleci/windows, but named.
@@ -109,10 +110,20 @@ commands:
             sudo bash -c "echo -e 'build --config=remote' >> .bazelrc.user";
             echo "Reading from remote cache for bazel remote jobs.";
 
+  install_python:
+    steps:
+      - run:
+          name: "Install Python 2"
+          command: |
+            sudo apt-get update > /dev/null 2>&1
+            sudo apt-get install -y python
+            python --version
+
 # Job definitions
 jobs:
   setup:
     executor: action-executor
+    resource_class: medium
     steps:
       - checkout
       - run:
@@ -130,7 +141,6 @@ jobs:
       - restore_cache:
           keys:
             - *cache_key
-            - *cache_key_fallback
       - run: yarn install --frozen-lockfile
       - persist_to_workspace:
           root: *workspace_location
@@ -156,29 +166,14 @@ jobs:
     executor: action-executor
     steps:
       - custom_attach_workspace
-      - run: yarn validate --ci
-
-  test:
-    executor: action-executor
-    steps:
-      - custom_attach_workspace
-      - run: yarn test --full
-
-  test-large:
-    parameters:
-      ve:
-        type: boolean
-        default: false
-      glob:
-        type: string
-        default: ""
-    executor: test-executor
-    resource_class: large
-    parallelism: 4
-    steps:
-      - custom_attach_workspace
-      - run: yarn webdriver-update
-      - run: yarn test-large --full <<# parameters.ve >>--ve<</ parameters.ve >> <<# parameters.glob >>--glob="<< parameters.glob >>"<</ parameters.glob >> --nb-shards=${CIRCLE_NODE_TOTAL} --shard=${CIRCLE_NODE_INDEX}
+      - run:
+          name: Validate Commit Messages
+          command: yarn -s admin validate-commits
+      - run:
+          name: Validate "do not submit" Commits
+          command: yarn -s admin validate-do-not-submit
+      - run:
+          command: yarn -s admin validate --ci
 
   e2e-cli:
     parameters:
@@ -189,23 +184,25 @@ jobs:
         type: boolean
         default: false
     executor: test-executor
-    parallelism: 4
+    parallelism: 6
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - run:
           name: Initialize Environment
           command: ./.circleci/env.sh
       - run:
           name: Execute CLI E2E Tests
-          command: PATH=~/.npm-global/bin:$PATH node ./tests/legacy-cli/run_e2e --nb-shards=${CIRCLE_NODE_TOTAL} --shard=${CIRCLE_NODE_INDEX} <<# parameters.ve >>--ve<</ parameters.ve >> <<# parameters.snapshots >>--ng-snapshots<</ parameters.snapshots >>
+          command: PATH=~/.npm-global/bin:$PATH node ./tests/legacy-cli/run_e2e --nb-shards=${CIRCLE_NODE_TOTAL} --shard=${CIRCLE_NODE_INDEX} <<# parameters.ve >>--ve<</ parameters.ve >> <<# parameters.snapshots >>--ng-snapshots<</ parameters.snapshots >> --tmpdir=/mnt/ramdisk
 
   e2e-cli-node-10:
     executor:
       name: test-executor
-      nodeversion: "10.16"
+      nodeversion: "10.20"
     parallelism: 4
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - run:
           name: Initialize Environment
           command: |
@@ -219,6 +216,7 @@ jobs:
       name: test-executor
     environment:
       E2E_BROWSERS: true
+    resource_class: medium
     steps:
       - custom_attach_workspace
       - run:
@@ -244,28 +242,32 @@ jobs:
       - custom_attach_workspace
       - run: yarn build
 
-  # This is where we put all the misbehaving and flaky tests so we can fine-tune their conditions 
-  # and rerun them faster.
-  flake-jail:
+  test:
     executor: test-executor
-    resource_class: medium
-    steps:
-      - custom_attach_workspace
-      - run: yarn webdriver-update
-      - run: yarn test-large --full --flakey --ve
-      - run: yarn test-large --full --flakey
-
-  build-bazel:
-    executor: action-executor
     resource_class: xlarge
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - setup_bazel_rbe
       - run: sudo cp .circleci/bazel.rc /etc/bazel.bazelrc
-      - run: yarn bazel:test
+      - run:
+          command: yarn bazel:test
+          no_output_timeout: 20m
+
+  integration:
+    executor: test-executor
+    resource_class: xlarge
+    steps:
+      - custom_attach_workspace
+      - install_python
+      - run: sudo cp .circleci/bazel.rc /etc/bazel.bazelrc
+      - run: 
+          command: yarn bazel:integration
+          no_output_timeout: 20m
 
   snapshot_publish:
     executor: action-executor
+    resource_class: medium
     steps:
       - custom_attach_workspace
       - run:
@@ -280,19 +282,6 @@ jobs:
           command: |
             yarn admin snapshots --verbose --githubTokenFile=${HOME}/github_token
 
-  publish:
-    executor: action-executor
-    steps:
-      - custom_attach_workspace
-      - run:
-          name: Decrypt Credentials
-          command: |
-            openssl aes-256-cbc -d -in .circleci/npm_token -k "${KEY}" -out ~/.npmrc
-      - run:
-          name: Deployment to NPM
-          command: |
-            yarn admin publish --verbose
-
   # Windows jobs
   # CircleCI support for Windows jobs is still in preview.
   # Docs: https://github.com/CircleCI-Public/windows-preview-docs
@@ -304,7 +293,6 @@ jobs:
       - restore_cache:
           keys:
             - *cache_key_win
-            - *cache_key_fallback_win
       - run: yarn install --frozen-lockfile
       - run: yarn build
       - save_cache:
@@ -324,9 +312,8 @@ jobs:
     steps:
       - custom_attach_workspace
       - setup_windows
-      - run: yarn test --full
       # Run partial e2e suite on PRs only. Master will run the full e2e suite with sharding.
-      - run: if (Test-Path env:CIRCLE_PR_NUMBER) { node tests\legacy-cli\run_e2e.js "--glob=tests/{basic,ivy}/**" }
+      - run: if (Test-Path env:CIRCLE_PR_NUMBER) { node tests\legacy-cli\run_e2e.js "--glob={tests/basic/**,tests/i18n/extract-ivy.ts}" }
              
   e2e-cli-win:
     executor: windows-executor
@@ -355,21 +342,6 @@ workflows:
             branches:
               ignore:
               - /docs-preview/
-      - build-bazel:
-          requires:
-            - build
-      - test:
-          requires:
-            - build
-      - test-large:
-          requires:
-            - build
-      - test-large:
-          name: test-large-ve
-          ve: true
-          glob: "packages/angular_devkit/@(build_angular|build_ng_packagr)/@(src|test)/@(build|browser)/*_spec_large.ts"
-          requires:
-            - build
       - e2e-cli:
           post-steps:
             - store_artifacts:
@@ -387,36 +359,38 @@ workflows:
           snapshots: true
           requires:
             - e2e-cli
-          pre-steps:
-            - run:
-                name: Don't run expensive e2e snapshots tests for forks other than renovate-bot and angular
-                command: >
-                  if [[ "$CIRCLE_PR_USERNAME" != "renovate-bot" ]] &&
-                    [[ "$CIRCLE_PROJECT_USERNAME" != "angular" || $CIRCLE_BRANCH != "master" ]]; then
-                    circleci step halt
-                  fi
+          filters:
+            branches:
+              only:
+                - renovate/angular
+                - master
       - e2e-cli:
           name: e2e-cli-ng-ve-snapshots
           snapshots: true
           ve: true
           requires:
             - e2e-cli
-          pre-steps:
-            - run:
-                name: Don't run expensive e2e snapshots tests for forks other than renovate-bot and angular
-                command: >
-                  if [[ "$CIRCLE_PR_USERNAME" != "renovate-bot" ]] &&
-                    [[ "$CIRCLE_PROJECT_USERNAME" != "angular" || $CIRCLE_BRANCH != "master" ]]; then
-                    circleci step halt
-                  fi
+          filters:
+            branches:
+              only:
+                - renovate/angular
+                - master
       - e2e-cli-node-10:
-          <<: *ignore_pull_requests
+          <<: *only_release_branches
           requires:
             - e2e-cli
       - test-browsers:
           requires:
             - build
-      - flake-jail:
+
+      # Bazel jobs
+      # These jobs only really depend on Setup, but the build job is very quick to run (~35s) and
+      # will catch any build errors before proceeding to the more lengthy and resource intensive 
+      # Bazel jobs.
+      - test:
+          requires:
+            - build
+      - integration:
           requires:
             - build
       
@@ -431,29 +405,18 @@ workflows:
             - build
       - test-win:
           requires:
-            - setup-and-build-win
             - test
+            - setup-and-build-win
       - e2e-cli-win:
-          <<: *ignore_pull_requests
+          <<: *only_release_branches
           requires:
             - setup-and-build-win
             - e2e-cli
       
       # Publish jobs
       - snapshot_publish:
-          <<: *ignore_pull_requests
+          <<: *only_release_branches
           requires:
-            - test
             - build
-            - e2e-cli
-      - publish:
-          requires:
             - test
-            - build
             - e2e-cli
-            - snapshot_publish
-          filters:
-            tags:
-              only: /^v\d+/
-            branches:
-              ignore: /.*/

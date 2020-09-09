@@ -12,7 +12,7 @@ import { Schema as PwaOptions } from './schema';
 describe('PWA Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
     '@angular/pwa',
-    path.join(__dirname, '../collection.json'),
+    require.resolve(path.join(__dirname, '../collection.json')),
   );
   const defaultOptions: PwaOptions = {
     project: 'bar',
@@ -23,15 +23,13 @@ describe('PWA Schematic', () => {
 
   let appTree: UnitTestTree;
 
-  // tslint:disable-next-line:no-any
-  const workspaceOptions: any = {
+  const workspaceOptions = {
     name: 'workspace',
     newProjectRoot: 'projects',
     version: '6.0.0',
   };
 
-  // tslint:disable-next-line:no-any
-  const appOptions: any = {
+  const appOptions = {
     name: 'bar',
     inlineStyle: false,
     inlineTemplate: false,

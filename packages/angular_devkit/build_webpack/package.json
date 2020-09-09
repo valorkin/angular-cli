@@ -9,14 +9,10 @@
   "dependencies": {
     "@angular-devkit/architect": "0.0.0",
     "@angular-devkit/core": "0.0.0",
-    "rxjs": "6.5.3"
+    "rxjs": "6.6.2"
   },
   "peerDependencies": {
     "webpack": "^4.6.0",
     "webpack-dev-server": "^3.1.4"
-  },
-  "devDependencies": {
-    "webpack": "next",
-    "webpack-dev-server": "next"
   }
 }

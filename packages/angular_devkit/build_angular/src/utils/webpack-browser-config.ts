@@ -27,6 +27,7 @@ import {
   normalizeBrowserSchema,
 } from '../utils';
 import { BuildBrowserFeatures } from './build-browser-features';
+import { profilingEnabled } from './environment-options';
 import { I18nOptions, configureI18nBuild } from './i18n-options';
 
 const SpeedMeasurePlugin = require('speed-measure-webpack-plugin');
@@ -82,7 +83,6 @@ export async function generateWebpackConfig(
       // Under downlevel differential loading we copy the assets outside of webpack.
       assets: [],
       esVersionInFileName: true,
-      es5BrowserSupport: undefined,
     };
   }
 
@@ -108,13 +108,20 @@ export async function generateWebpackConfig(
     if (!webpackConfig.resolve) {
       webpackConfig.resolve = {};
     }
-    if (!webpackConfig.resolve.alias) {
-      webpackConfig.resolve.alias = {};
+    if (Array.isArray(webpackConfig.resolve.alias)) {
+      webpackConfig.resolve.alias.push({
+        alias: 'zone.js/dist/zone',
+        name: 'zone.js/dist/zone-evergreen',
+      });
+    } else {
+      if (!webpackConfig.resolve.alias) {
+        webpackConfig.resolve.alias = {};
+      }
+      webpackConfig.resolve.alias['zone.js/dist/zone'] = 'zone.js/dist/zone-evergreen';
     }
-    webpackConfig.resolve.alias['zone.js/dist/zone'] = 'zone.js/dist/zone-evergreen';
   }
 
-  if (options.profile || process.env['NG_BUILD_PROFILING']) {
+  if (profilingEnabled) {
     const esVersionInFileName = getEsVersionForFileName(
       tsConfig.options.target,
       wco.buildOptions.esVersionInFileName,
@@ -145,14 +152,54 @@ export async function generateI18nBrowserWebpackConfigFromContext(
   const config = result.config;
 
   if (i18n.shouldInline) {
-    // Remove localize "polyfill"
-    if (!config.resolve) {
-      config.resolve = {};
+    // Remove localize "polyfill" if in AOT mode
+    if (buildOptions.aot) {
+      if (!config.resolve) {
+        config.resolve = {};
+      }
+      if (Array.isArray(config.resolve.alias)) {
+        config.resolve.alias.push({
+          alias: '@angular/localize/init',
+          name: require.resolve('./empty.js'),
+        });
+      } else {
+        if (!config.resolve.alias) {
+          config.resolve.alias = {};
+        }
+        config.resolve.alias['@angular/localize/init'] = require.resolve('./empty.js');
+      }
     }
-    if (!config.resolve.alias) {
-      config.resolve.alias = {};
+
+    // Update file hashes to include translation file content
+    const i18nHash = Object.values(i18n.locales).reduce(
+      (data, locale) => data + locale.files.map((file) => file.integrity || '').join('|'),
+      '',
+    );
+    if (!config.plugins) {
+      config.plugins = [];
     }
-    config.resolve.alias['@angular/localize/init'] = require.resolve('./empty.js');
+    config.plugins.push({
+      apply(compiler: webpack.Compiler) {
+        compiler.hooks.compilation.tap('build-angular', compilation => {
+          // Webpack typings do not contain template hashForChunk hook
+          // tslint:disable-next-line: no-any
+          (compilation.mainTemplate.hooks as any).hashForChunk.tap(
+            'build-angular',
+            (hash: { update(data: string): void }) => {
+              hash.update('$localize' + i18nHash);
+            },
+          );
+          // Webpack typings do not contain hooks property
+          // tslint:disable-next-line: no-any
+          (compilation.chunkTemplate as any).hooks.hashForChunk.tap(
+            'build-angular',
+            (hash: { update(data: string): void }) => {
+              hash.update('$localize' + i18nHash);
+            },
+          );
+        });
+      },
+    });
   }
 
   return { ...result, i18n };
