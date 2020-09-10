@@ -6,8 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { Compiler } from 'webpack';
-import { addWarning } from '../../utils/webpack-diagnostics';
+import {Compiler} from 'webpack';
+import {addWarning} from '../../utils/webpack-diagnostics';
 
 interface AfterResolveResult {
   request: string;
@@ -15,15 +15,17 @@ interface AfterResolveResult {
   context: {
     issuer: string;
   };
-  resourceResolveData: {
-    relativePath: string;
-    descriptionFileRoot: string;
-    descriptionFilePath: string;
-    descriptionFileData: {
-      name?: string;
-      version?: string;
+  createData: {
+    resourceResolveData: {
+      relativePath: string;
+      descriptionFileRoot: string;
+      descriptionFilePath: string;
+      descriptionFileData: {
+        name?: string;
+        version?: string;
+      };
     };
-  };
+  }
 }
 
 export interface DedupeModuleResolvePluginOptions {
@@ -42,18 +44,19 @@ export interface DedupeModuleResolvePluginOptions {
 export class DedupeModuleResolvePlugin {
   modules = new Map<string, { request: string, resource: string }>();
 
-  constructor(private options?: DedupeModuleResolvePluginOptions) { }
+  constructor(private options?: DedupeModuleResolvePluginOptions) {
+  }
 
   apply(compiler: Compiler) {
-    compiler.hooks.compilation.tap('DedupeModuleResolvePlugin', (compilation, { normalModuleFactory }) => {
+    compiler.hooks.compilation.tap('DedupeModuleResolvePlugin', (compilation, {normalModuleFactory}) => {
       // @ts-ignore
       normalModuleFactory.hooks.afterResolve.tap('DedupeModuleResolvePlugin', (result: AfterResolveResult | undefined) => {
         if (!result) {
           return;
         }
 
-        const { resource, request, resourceResolveData } = result;
-        const { descriptionFileData, relativePath } = resourceResolveData;
+        const {resource, request, createData} = result;
+        const {descriptionFileData, relativePath} = createData.resourceResolveData;
 
         // Empty name or versions are no valid primary  entrypoints of a library
         if (!descriptionFileData.name || !descriptionFileData.version) {
@@ -73,7 +76,7 @@ export class DedupeModuleResolvePlugin {
           return;
         }
 
-        const { resource: prevResource, request: prevRequest } = prevResolvedModule;
+        const {resource: prevResource, request: prevRequest} = prevResolvedModule;
         if (result.resource === prevResource) {
           // No deduping needed.
           // Current path and previously resolved path are the same.

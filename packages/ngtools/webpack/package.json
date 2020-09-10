@@ -28,12 +28,12 @@
   "peerDependencies": {
     "@angular/compiler-cli": "^10.0.0",
     "typescript": ">=3.9 < 4.1",
-    "webpack": "next"
+    "webpack": "5.0.0-beta.17"
   },
   "devDependencies": {
     "@angular/compiler": "10.1.0",
     "@angular/compiler-cli": "10.1.0",
     "typescript": "4.0.2",
-    "webpack": "next"
+    "webpack": "5.0.0-beta.17"
   }
 }

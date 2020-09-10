@@ -583,7 +583,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     },
     optimization: {
       minimizer: extraMinimizers,
-      moduleIds: 'hashed',
+      moduleIds: 'deterministic',
       noEmitOnErrors: true,
     },
     plugins: [

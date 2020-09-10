@@ -12,7 +12,7 @@
     "rxjs": "6.6.2"
   },
   "peerDependencies": {
-    "webpack": "next",
+    "webpack": "5.0.0-beta.17",
     "webpack-dev-server": "next"
   }
 }

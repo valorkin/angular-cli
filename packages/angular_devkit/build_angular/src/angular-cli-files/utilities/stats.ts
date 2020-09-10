@@ -7,11 +7,11 @@
  */
 // tslint:disable
 // TODO: cleanup this file, it's copied as is from Angular CLI.
-import { tags, terminal } from '@angular-devkit/core';
+import {tags, terminal} from '@angular-devkit/core';
 import * as path from 'path';
 
 
-const { bold, green, red, reset, white, yellow } = terminal;
+const {bold, green, red, reset, white, yellow} = terminal;
 
 export function formatSize(size: number): string {
   if (size <= 0) {
@@ -53,7 +53,7 @@ export function generateBundleStats(
 
 export function generateBuildStats(hash: string, time: number, colors: boolean): string {
   const w = (x: string) => colors ? bold(white(x)) : x;
-  return `Date: ${w(new Date().toISOString())} - Hash: ${w(hash)} - Time: ${w('' + time)}ms`
+  return `Date: ${w(new Date().toISOString())} - Hash: ${w(hash)} - Time: ${w('' + time)}ms`;
 }
 
 export function statsToString(json: any, statsConfig: any) {
@@ -65,8 +65,10 @@ export function statsToString(json: any, statsConfig: any) {
     .filter((chunk: any) => chunk.rendered)
     .map((chunk: any) => {
       const assets = json.assets.filter((asset: any) => chunk.files.indexOf(asset.name) != -1);
-      const summedSize = assets.filter((asset: any) => !asset.name.endsWith(".map")).reduce((total: number, asset: any) => { return total + asset.size }, 0);
-      return generateBundleStats({ ...chunk, size: summedSize }, colors);
+      const summedSize = assets.filter((asset: any) => !asset.name.endsWith('.map')).reduce((total: number, asset: any) => {
+        return total + asset.size;
+      }, 0);
+      return generateBundleStats({...chunk, size: summedSize}, colors);
     });
 
   const unchangedChunkNumber = json.chunks.length - changedChunksStats.length;
@@ -104,7 +106,10 @@ export function statsWarningsToString(json: any, statsConfig: any): string {
   }
 
   return rs('\n' + warnings
-    .map((warning: any) => `${warning}`)
+    .map((warning: any) => {
+      console.warn(warning);
+      return `${warning}`;
+    })
     .filter(ERRONEOUS_WARNINGS_FILTER)
     .map((warning: string) => y(`WARNING in ${warning}`))
     .join('\n\n'));
