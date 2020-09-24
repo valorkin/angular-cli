@@ -295,7 +295,7 @@ async function setupLocalize(
     if (Array.isArray(webpackConfig.entry['main'])) {
       webpackConfig.entry['main'].unshift(localeDescription.dataPath);
     } else {
-      webpackConfig.entry['main'] = [localeDescription.dataPath, webpackConfig.entry['main']];
+      webpackConfig.entry['main'] = [localeDescription.dataPath, webpackConfig.entry['main'] as string];
     }
   }
 
@@ -587,9 +587,9 @@ function _addLiveReload(
     webpackConfig.entry = {};
   }
   if (!Array.isArray(webpackConfig.entry.main)) {
-    webpackConfig.entry.main = [];
+    webpackConfig.entry.main = [] as any;
   }
-  webpackConfig.entry.main.unshift(...entryPoints);
+  (webpackConfig.entry.main as string[]).unshift(...entryPoints);
 }
 
 /**

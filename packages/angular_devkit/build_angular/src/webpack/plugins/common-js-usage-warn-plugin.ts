@@ -16,6 +16,8 @@ const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequ
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
 // The below is extended because there are not in the typings
+//TODO_WEBPACK_5 in webpack5 typings is `issuer:Module`
+//@ts-ignore
 interface WebpackModule extends compilation.Module {
   name?: string;
   rawRequest?: string;
@@ -34,7 +36,7 @@ export interface CommonJsUsageWarnPluginOptions {
 export class CommonJsUsageWarnPlugin {
   private shownWarnings = new Set<string>();
 
-  // Allow the below depedency for HMR
+  // Allow the below dependency for HMR
   // tslint:disable-next-line: max-line-length
   // https://github.com/angular/angular-cli/blob/1e258317b1f6ec1e957ee3559cc3b28ba602f3ba/packages/angular_devkit/build_angular/src/dev-server/index.ts#L605-L638
   private allowedDepedencies = new Set<string>(['webpack/hot/dev-server']);

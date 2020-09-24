@@ -121,7 +121,8 @@ export class OptimizeCssWebpackPlugin {
           } else {
             newSource = new RawSource(output.css);
           }
-
+          //TODO_WEBPACK_5 webpack-sources@2 has buffers() property, but @types\webpack-sources has to be updated
+          //@ts-ignore
           compilation.assets[file] = newSource;
         });
 

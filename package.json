@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "Software Development Kit for Angular",
+  "resolutions": {
+    "webpack": "^5.0.0-rc.0"
+  },
   "bin": {
     "architect": "./bin/architect",
     "benchmark": "./bin/benchmark",
@@ -123,7 +126,6 @@
     "@types/uuid": "^8.0.0",
     "@types/webpack": "^4.41.22",
     "@types/webpack-dev-server": "^3.1.7",
-    "@types/webpack-sources": "^1.4.2",
     "@yarnpkg/lockfile": "1.1.0",
     "ajv": "6.12.5",
     "ansi-colors": "4.1.1",
@@ -233,7 +235,7 @@
     "webpack-dev-middleware": "3.7.2",
     "webpack-dev-server": "3.10.3",
     "webpack-merge": "5.1.4",
-    "webpack-sources": "1.4.3",
+    "webpack-sources": "2.0.0",
     "webpack-subresource-integrity": "1.4.0",
     "worker-plugin": "5.0.0",
     "zone.js": "^0.10.2"
