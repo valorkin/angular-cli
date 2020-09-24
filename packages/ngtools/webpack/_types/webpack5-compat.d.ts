@@ -1,3 +1,5 @@
+// copy of:
+// import '../../../../_types/webpack5-compat'
 import 'webpack';
 import 'webpack-sources';
 import {
@@ -307,4 +309,3 @@ declare module 'webpack' {
     }
   }
 }
-
