@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright Google Inc. All Rights Reserved.
@@ -10,13 +9,15 @@
 import { isAbsolute } from 'path';
 import { Compiler, compilation } from 'webpack';
 import { addWarning } from '../../utils/webpack-diagnostics';
+import { isWebpackFiveOrHigher } from "../../utils/webpack-version";
 
 // Webpack doesn't export these so the deep imports can potentially break.
 const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency');
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
 // The below is extended because there are not in the typings
-//TODO_WEBPACK_5 in webpack5 typings is `issuer:Module`
+// TODO_WEBPACK_5 type Types of property 'issuer' are incompatible.
+// Type 'WebpackModule | null' is not assignable to type 'Module'
 //@ts-ignore
 interface WebpackModule extends compilation.Module {
   name?: string;
@@ -30,7 +31,7 @@ interface WebpackModule extends compilation.Module {
 
 export interface CommonJsUsageWarnPluginOptions {
   /** A list of CommonJS packages that are allowed to be used without a warning. */
-  allowedDepedencies?: string[];
+  allowedDependencies?: string[];
 }
 
 export class CommonJsUsageWarnPlugin {
@@ -39,22 +40,22 @@ export class CommonJsUsageWarnPlugin {
   // Allow the below dependency for HMR
   // tslint:disable-next-line: max-line-length
   // https://github.com/angular/angular-cli/blob/1e258317b1f6ec1e957ee3559cc3b28ba602f3ba/packages/angular_devkit/build_angular/src/dev-server/index.ts#L605-L638
-  private allowedDepedencies = new Set<string>(['webpack/hot/dev-server']);
+  private allowedDependencies = new Set<string>(['webpack/hot/dev-server']);
 
   constructor(private options: CommonJsUsageWarnPluginOptions = {}) {
-    this.options.allowedDepedencies?.forEach(d => this.allowedDepedencies.add(d));
+    this.options.allowedDependencies?.forEach(d => this.allowedDependencies.add(d));
   }
 
   apply(compiler: Compiler) {
     compiler.hooks.compilation.tap('CommonJsUsageWarnPlugin', compilation => {
       compilation.hooks.finishModules.tap('CommonJsUsageWarnPlugin', modules => {
-        for (const { dependencies, rawRequest, issuer } of modules as unknown as WebpackModule[]) {
+        for (const {dependencies, rawRequest, issuer} of modules as unknown as WebpackModule[]) {
           if (
             !rawRequest ||
             rawRequest.startsWith('.') ||
             isAbsolute(rawRequest) ||
-            this.allowedDepedencies.has(rawRequest) ||
-            this.allowedDepedencies.has(this.rawRequestToPackageName(rawRequest)) ||
+            this.allowedDependencies.has(rawRequest) ||
+            this.allowedDependencies.has(this.rawRequestToPackageName(rawRequest)) ||
             rawRequest.startsWith('@angular/common/locales/')
           ) {
             /**
@@ -66,13 +67,13 @@ export class CommonJsUsageWarnPlugin {
             continue;
           }
 
-          if (this.hasCommonJsDependencies(dependencies)) {
+          if (this.hasCommonJsDependencies(compilation, dependencies)) {
             // Dependency is CommonsJS or AMD.
 
             // Check if it's parent issuer is also a CommonJS dependency.
             // In case it is skip as an warning will be show for the parent CommonJS dependency.
             const parentDependencies = issuer?.issuer?.dependencies;
-            if (parentDependencies && this.hasCommonJsDependencies(parentDependencies, true)) {
+            if (parentDependencies && this.hasCommonJsDependencies(compilation, parentDependencies, true)) {
               continue;
             }
 
@@ -102,13 +103,18 @@ export class CommonJsUsageWarnPlugin {
     });
   }
 
-  private hasCommonJsDependencies(dependencies: WebpackModule[], checkParentModules = false): boolean {
+  private hasCommonJsDependencies(
+    compilation: compilation.Compilation,
+    dependencies: WebpackModule[],
+    checkParentModules = false
+  ): boolean {
     for (const dep of dependencies) {
       if (dep instanceof CommonJsRequireDependency || dep instanceof AMDDefineDependency) {
         return true;
       }
 
-      if (checkParentModules && dep.module && this.hasCommonJsDependencies(dep.module.dependencies)) {
+      const module = getWebpackModule(compilation, dep);
+      if (checkParentModules && module && this.hasCommonJsDependencies(compilation, module.dependencies)) {
         return true;
       }
     }
@@ -123,5 +129,22 @@ export class CommonJsUsageWarnPlugin {
       // Non-scoped request ex: lodash/isEmpty -> lodash
       : rawRequest.split('/', 1)[0];
   }
+}
 
+// TODO_WEBPACK_5 ModuleGraph type stub
+interface ModuleGraph {
+  getModule(dependency: WebpackModule): WebpackModule;
+}
+
+interface Webpack5Compilation/* extends compilation.Compilation*/ {
+  moduleGraph: ModuleGraph;
+}
+
+function getWebpackModule(compilation: compilation.Compilation, dependency: WebpackModule): WebpackModule | null {
+  if (!isWebpackFiveOrHigher()) {
+    return dependency.module;
+  }
+  // TODO_WEBPACK-5 Type 'WebpackModule' is missing the following properties from type 'Dependency':
+  // weak, loc, category, getResourceIdentifier, and 6 more.
+  return (compilation as unknown as Webpack5Compilation).moduleGraph.getModule(dependency);
 }
