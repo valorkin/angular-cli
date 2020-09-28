@@ -141,6 +141,8 @@ export async function execute(
       },
       sourceMap: {
         scripts: true,
+        styles: false,
+        vendor: true,
       },
       buildOptimizer: false,
       i18nLocale: options.i18nLocale || i18n.sourceLocale,
@@ -187,7 +189,7 @@ export async function execute(
           module: {
             rules: [
               {
-                test: /\.ts$/,
+                test: /\.[t|j]s$/,
                 loader: require.resolve('./ivy-extract-loader'),
                 options: {
                   messageHandler: (messages: LocalizeMessage[]) => ivyMessages.push(...messages),
@@ -210,11 +212,10 @@ export async function execute(
     } catch {}
 
     if (!validLocalizePackage) {
-      context.logger.error(
-        "Ivy extraction requires the '@angular/localize' package version 10.1.0 or higher.",
-      );
-
-      return { success: false };
+      return {
+        success: false,
+        error: `Ivy extraction requires the '@angular/localize' package version 10.1.0 or higher.`,
+       };
     }
   }
 
