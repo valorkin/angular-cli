@@ -242,8 +242,8 @@ declare module 'webpack' {
     }
   }
   namespace compilation {
-    type Compilation = CompilationWp5;
-    type Module = ModuleWp5;
+    class Compilation extends CompilationWp5 {}
+    class Module extends ModuleWp5 {}
     type Chunk = any;
   }
   namespace Stats {

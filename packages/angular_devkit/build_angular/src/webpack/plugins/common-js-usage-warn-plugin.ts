@@ -9,7 +9,7 @@
 import { isAbsolute } from 'path';
 import { Compiler, compilation } from 'webpack';
 import { addWarning } from '../../utils/webpack-diagnostics';
-import { isWebpackFiveOrHigher } from "../../utils/webpack-version";
+import { isWebpackFiveOrHigher } from '../../utils/webpack-version';
 
 // Webpack doesn't export these so the deep imports can potentially break.
 const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequireDependency');
@@ -49,7 +49,9 @@ export class CommonJsUsageWarnPlugin {
   apply(compiler: Compiler) {
     compiler.hooks.compilation.tap('CommonJsUsageWarnPlugin', compilation => {
       compilation.hooks.finishModules.tap('CommonJsUsageWarnPlugin', modules => {
-        for (const {dependencies, rawRequest, issuer} of modules as unknown as WebpackModule[]) {
+        for (const module of modules as unknown as WebpackModule[]) {
+          const {dependencies, rawRequest} = module;
+          const issuer = getIssuer(compilation, module);
           if (
             !rawRequest ||
             rawRequest.startsWith('.') ||
@@ -72,15 +74,17 @@ export class CommonJsUsageWarnPlugin {
 
             // Check if it's parent issuer is also a CommonJS dependency.
             // In case it is skip as an warning will be show for the parent CommonJS dependency.
-            const parentDependencies = issuer?.issuer?.dependencies;
+            const parentDependencies = getIssuer(compilation, issuer)?.dependencies;
             if (parentDependencies && this.hasCommonJsDependencies(compilation, parentDependencies, true)) {
               continue;
             }
 
             // Find the main issuer (entry-point).
             let mainIssuer = issuer;
-            while (mainIssuer?.issuer) {
-              mainIssuer = mainIssuer.issuer;
+            let nextIssuer = getIssuer(compilation, mainIssuer);
+            while (nextIssuer) {
+              mainIssuer = nextIssuer;
+              nextIssuer = getIssuer(compilation, mainIssuer);
             }
 
             // Only show warnings for modules from main entrypoint.
@@ -106,16 +110,17 @@ export class CommonJsUsageWarnPlugin {
   private hasCommonJsDependencies(
     compilation: compilation.Compilation,
     dependencies: WebpackModule[],
-    checkParentModules = false
-  ): boolean {
+    checkParentModules = false): boolean {
     for (const dep of dependencies) {
       if (dep instanceof CommonJsRequireDependency || dep instanceof AMDDefineDependency) {
         return true;
       }
 
-      const module = getWebpackModule(compilation, dep);
-      if (checkParentModules && module && this.hasCommonJsDependencies(compilation, module.dependencies)) {
-        return true;
+      if (checkParentModules) {
+        const module = getWebpackModule(compilation, dep);
+        if (module && this.hasCommonJsDependencies(compilation, module.dependencies)) {
+          return true;
+        }
       }
     }
 
@@ -131,20 +136,24 @@ export class CommonJsUsageWarnPlugin {
   }
 }
 
-// TODO_WEBPACK_5 ModuleGraph type stub
-interface ModuleGraph {
-  getModule(dependency: WebpackModule): WebpackModule;
-}
+function getIssuer(compilation: compilation.Compilation, module: WebpackModule|null): WebpackModule|null {
+  if (!module) {
+    return null;
+  }
 
-interface Webpack5Compilation/* extends compilation.Compilation*/ {
-  moduleGraph: ModuleGraph;
+  if(!isWebpackFiveOrHigher()) {
+    return module?.issuer;
+  }
+
+  return (compilation as unknown as { moduleGraph: { getIssuer(dependency: WebpackModule): WebpackModule; }})
+    .moduleGraph.getIssuer(module);
 }
 
 function getWebpackModule(compilation: compilation.Compilation, dependency: WebpackModule): WebpackModule | null {
   if (!isWebpackFiveOrHigher()) {
     return dependency.module;
   }
-  // TODO_WEBPACK-5 Type 'WebpackModule' is missing the following properties from type 'Dependency':
-  // weak, loc, category, getResourceIdentifier, and 6 more.
-  return (compilation as unknown as Webpack5Compilation).moduleGraph.getModule(dependency);
+
+  return (compilation as unknown as { moduleGraph: { getModule(dependency: WebpackModule): WebpackModule; }})
+    .moduleGraph.getModule(dependency);
 }

@@ -10,11 +10,14 @@ import { ProcessOptions, Result } from 'postcss';
 import { Compiler, compilation } from 'webpack';
 import { RawSource, SourceMapSource } from 'webpack-sources';
 import { addWarning } from '../../utils/webpack-diagnostics';
+import { isWebpackFiveOrHigher } from '../../utils/webpack-version';
 
 export interface OptimizeCssWebpackPluginOptions {
   sourceMap: boolean;
   test: (file: string) => boolean;
 }
+
+const PLUGIN_NAME = 'optimize-css-webpack-plugin';
 
 function hook(
   compiler: Compiler,
@@ -23,10 +26,19 @@ function hook(
     chunks: Iterable<compilation.Chunk>,
   ) => Promise<void>,
 ) {
-  compiler.hooks.compilation.tap('optimize-css-webpack-plugin', (compilation) => {
-    compilation.hooks.optimizeChunkAssets.tapPromise('optimize-css-webpack-plugin', (chunks) =>
-      action(compilation, chunks),
-    );
+  compiler.hooks.compilation.tap('optimize-css-webpack-plugin', (compilationInstance) => {
+    const optimizeChunkAssets = (chunks: compilation.Chunk) => action(compilationInstance, chunks);
+    if (isWebpackFiveOrHigher()) {
+      // webpack 5 migration "guide"
+      // https://github.com/webpack/webpack/blob/07fc554bef5930f8577f91c91a8b81791fc29746/lib/Compilation.js#L527-L532
+      const stage = (compilation?.Compilation as unknown as {PROCESS_ASSETS_STAGE_OPTIMIZE: number})?.PROCESS_ASSETS_STAGE_OPTIMIZE;
+      // tslint:disable-next-line: no-any
+      (compilationInstance.hooks as any)
+        .processAssets.tap({name: PLUGIN_NAME, stage}, optimizeChunkAssets);
+    } else {
+      compilationInstance.hooks.optimizeChunkAssets
+        .tapPromise(PLUGIN_NAME, optimizeChunkAssets);
+    }
   });
 }
 
