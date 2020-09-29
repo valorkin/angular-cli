@@ -122,6 +122,7 @@ export class OptimizeCssWebpackPlugin {
             newSource = new RawSource(output.css);
           }
 
+          // @ts-ignore
           compilation.assets[file] = newSource;
         });
 
