@@ -1,4 +1,3 @@
-
 /**
  * @license
  * Copyright Google Inc. All Rights Reserved.
@@ -17,9 +16,6 @@ const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequ
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
 // The below is extended because there are not in the typings
-// TODO_WEBPACK_5 type Types of property 'issuer' are incompatible.
-// Type 'WebpackModule | null' is not assignable to type 'Module'
-//@ts-ignore
 interface WebpackModule extends compilation.Module {
   name?: string;
   rawRequest?: string;
@@ -52,7 +48,6 @@ export class CommonJsUsageWarnPlugin {
       compilation.hooks.finishModules.tap('CommonJsUsageWarnPlugin', modules => {
         for (const module of modules as unknown as WebpackModule[]) {
           const {dependencies, rawRequest} = module;
-          const issuer = getIssuer(compilation, module);
           if (
             !rawRequest ||
             rawRequest.startsWith('.') ||
@@ -72,7 +67,7 @@ export class CommonJsUsageWarnPlugin {
 
           if (this.hasCommonJsDependencies(compilation, dependencies)) {
             // Dependency is CommonsJS or AMD.
-
+            const issuer = getIssuer(compilation, module);
             // Check if it's parent issuer is also a CommonJS dependency.
             // In case it is skip as an warning will be show for the parent CommonJS dependency.
             const parentDependencies = getIssuer(compilation, issuer)?.dependencies;
@@ -137,16 +132,16 @@ export class CommonJsUsageWarnPlugin {
   }
 }
 
-function getIssuer(compilation: compilation.Compilation, module: WebpackModule|null): WebpackModule|null {
+function getIssuer(compilation: compilation.Compilation, module: WebpackModule | null): WebpackModule | null {
   if (!module) {
     return null;
   }
 
-  if(!isWebpackFiveOrHigher()) {
+  if (!isWebpackFiveOrHigher()) {
     return module?.issuer;
   }
 
-  return (compilation as unknown as { moduleGraph: { getIssuer(dependency: WebpackModule): WebpackModule; }})
+  return (compilation as unknown as { moduleGraph: { getIssuer(dependency: WebpackModule): WebpackModule; } })
     .moduleGraph.getIssuer(module);
 }
 

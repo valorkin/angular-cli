@@ -7,7 +7,7 @@
  */
 
 import * as path from 'path';
-import { Compiler, compilation } from 'webpack';
+import { Compiler } from 'webpack';
 import { Budget, Type } from '../../browser/schema';
 import { ThresholdSeverity, calculateThresholds, checkThresholds } from '../../utils/bundle-calculator';
 import { addError, addWarning } from '../../utils/webpack-diagnostics';
@@ -27,11 +27,11 @@ export class AnyComponentStyleBudgetChecker {
   }
 
   apply(compiler: Compiler) {
-    compiler.hooks.compilation.tap(PLUGIN_NAME, (compilationInstance) => {
+    compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       const afterOptimizeChunkAssets = () => {
         // In AOT compilations component styles get processed in child compilations.
         // tslint:disable-next-line: no-any
-        const parentCompilation = (compilationInstance.compiler as any).parentCompilation;
+        const parentCompilation = (compilation.compiler as any).parentCompilation;
         if (!parentCompilation) {
           return;
         }
@@ -44,10 +44,10 @@ export class AnyComponentStyleBudgetChecker {
           '.sass',
         ];
 
-        const componentStyles = Object.keys(compilationInstance.assets)
+        const componentStyles = Object.keys(compilation.assets)
           .filter((name) => cssExtensions.includes(path.extname(name)))
           .map((name) => ({
-            size: compilationInstance.assets[name].size(),
+            size: compilation.assets[name].size(),
             label: name,
           }));
         const thresholds = flatMap(this.budgets, (budget) => calculateThresholds(budget));
@@ -56,10 +56,10 @@ export class AnyComponentStyleBudgetChecker {
           for (const {severity, message} of checkThresholds(thresholds[Symbol.iterator](), size, label)) {
             switch (severity) {
               case ThresholdSeverity.Warning:
-                addWarning(compilationInstance, message);
+                addWarning(compilation, message);
                 break;
               case ThresholdSeverity.Error:
-                addError(compilationInstance, message);
+                addError(compilation, message);
                 break;
               default:
                 assertNever(severity);
@@ -72,11 +72,12 @@ export class AnyComponentStyleBudgetChecker {
       if (isWebpackFiveOrHigher()) {
         // webpack 5 migration "guide"
         // https://github.com/webpack/webpack/blob/07fc554bef5930f8577f91c91a8b81791fc29746/lib/Compilation.js#L535-L539
-        const stage = (compilation?.Compilation as unknown as {PROCESS_ASSETS_STAGE_OPTIMIZE: number})?.PROCESS_ASSETS_STAGE_OPTIMIZE + 1;
+        // TODO_WEBPACK_5 const stage = Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE + 1;
+        const stage = 101;
         // tslint:disable-next-line: no-any
-        (compilationInstance.hooks as any).processAssets.tap({name: PLUGIN_NAME, stage}, afterOptimizeChunkAssets);
+        (compilation.hooks as any).processAssets.tap({name: PLUGIN_NAME, stage}, afterOptimizeChunkAssets);
       } else {
-        compilationInstance.hooks.afterOptimizeChunkAssets.tap(PLUGIN_NAME, afterOptimizeChunkAssets);
+        compilation.hooks.afterOptimizeChunkAssets.tap(PLUGIN_NAME, afterOptimizeChunkAssets);
       }
     });
   }
@@ -84,7 +85,7 @@ export class AnyComponentStyleBudgetChecker {
 
 function assertNever(input: never): never {
   throw new Error(`Unexpected call to assertNever() with input: ${
-    JSON.stringify(input, null /* replacer */, 4 /* tabSize */)}`);
+      JSON.stringify(input, null /* replacer */, 4 /* tabSize */)}`);
 }
 
 function flatMap<T, R>(list: T[], mapper: (item: T, index: number, array: T[]) => IterableIterator<R>): R[] {

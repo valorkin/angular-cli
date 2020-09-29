@@ -3,9 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "description": "Software Development Kit for Angular",
-  "resolutions": {
-    "webpack": "^5.0.0-rc.0"
-  },
   "bin": {
     "architect": "./bin/architect",
     "benchmark": "./bin/benchmark",
@@ -126,6 +123,7 @@
     "@types/uuid": "^8.0.0",
     "@types/webpack": "^4.41.22",
     "@types/webpack-dev-server": "^3.1.7",
+    "@types/webpack-sources": "^1.4.2",
     "@yarnpkg/lockfile": "1.1.0",
     "ajv": "6.12.5",
     "ansi-colors": "4.1.1",
@@ -145,7 +143,7 @@
     "css-loader": "4.3.0",
     "cssnano": "4.1.10",
     "debug": "^4.1.1",
-    "enhanced-resolve": "5.0.0",
+    "enhanced-resolve": "5.1.0",
     "express": "4.17.1",
     "fast-json-stable-stringify": "2.1.0",
     "file-loader": "6.1.0",
@@ -217,7 +215,7 @@
     "symbol-observable": "2.0.1",
     "tar": "^6.0.0",
     "temp": "^0.9.0",
-    "terser": "5.3.2",
+    "terser": "5.3.3",
     "terser-webpack-plugin": "4.2.2",
     "text-table": "0.2.0",
     "through2": "^4.0.0",
@@ -235,7 +233,7 @@
     "webpack-dev-middleware": "3.7.2",
     "webpack-dev-server": "3.10.3",
     "webpack-merge": "5.1.4",
-    "webpack-sources": "2.0.0",
+    "webpack-sources": "2.0.1",
     "webpack-subresource-integrity": "1.4.0",
     "worker-plugin": "5.0.0",
     "zone.js": "^0.10.2"
