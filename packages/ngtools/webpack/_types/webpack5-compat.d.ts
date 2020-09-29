@@ -1,5 +1,4 @@
 import 'webpack';
-import 'webpack-sources';
 import {
   Compilation as CompilationWp5, Compiler,
   Module as ModuleWp5, Chunk as ChunkWp5
