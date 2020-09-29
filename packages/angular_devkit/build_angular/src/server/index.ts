@@ -84,6 +84,7 @@ export function execute(
   return from(initialize(options, context, transforms.webpackConfiguration)).pipe(
     concatMap(({ config, i18n }) => {
       return runWebpack(config, context, {
+        // @ts-ignore
         webpackFactory: require('webpack') as typeof webpack,
         logging: createWebpackLoggingCallback(!!options.verbose, context.logger),
       }).pipe(

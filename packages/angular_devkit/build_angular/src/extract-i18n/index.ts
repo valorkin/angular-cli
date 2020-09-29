@@ -227,6 +227,7 @@ export async function execute(
     context,
     {
       logging: createWebpackLoggingCallback(false, context.logger),
+      // @ts-ignore
       webpackFactory: await import('webpack'),
     },
   ).toPromise();

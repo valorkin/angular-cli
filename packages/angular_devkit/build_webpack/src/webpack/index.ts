@@ -19,6 +19,7 @@ export interface WebpackLoggingCallback {
   (stats: webpack.Stats, config: webpack.Configuration): void;
 }
 export interface WebpackFactory {
+  // @ts-ignore
   (config: webpack.Configuration, handler: webpack.Compiler.Handler): webpack.Compiler.Watching | webpack.Compiler;
   (config?: webpack.Configuration): webpack.Compiler;
 }
@@ -71,6 +72,7 @@ export function runWebpack(
             : webpack(config, callback);
 
           // Teardown logic. Close the watcher when unsubscribed from.
+          //@ts-ignore
           return () => (webpackWatcher as webpack.Compiler.Watching).close(() => {});
         } else {
           const webpackCompiler = options.webpackFactory

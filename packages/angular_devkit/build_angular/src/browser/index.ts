@@ -282,6 +282,7 @@ export function buildWebpackBrowser(
         const startTime = Date.now();
 
         return runWebpack(config, context, {
+          // @ts-ignore
           webpackFactory: require('webpack') as typeof webpack,
           logging:
             transforms.logging ||
