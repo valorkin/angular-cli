@@ -1,10 +1,8 @@
-// copy of:
-// import '../../../../_types/webpack5-compat'
 import 'webpack';
-// import 'webpack-sources';
+import 'webpack-sources';
 import {
   Compilation as CompilationWp5, Compiler,
-  Module as ModuleWp5,
+  Module as ModuleWp5, Chunk as ChunkWp5
 } from 'webpack';
 
 type loaderCallback = (err: Error | undefined | null, content?: string | Buffer, sourceMap?: RawSourceMap) => void;
@@ -244,9 +242,9 @@ declare module 'webpack' {
     }
   }
   namespace compilation {
-    type Compilation = CompilationWp5;
-    type Module = ModuleWp5;
-    type Chunk = any;
+    class Compilation extends CompilationWp5 {}
+    class Module extends ModuleWp5 {}
+    class Chunk extends ChunkWp5 {}
   }
   namespace Stats {
     interface ToJsonOutput {
@@ -309,3 +307,4 @@ declare module 'webpack' {
     }
   }
 }
+

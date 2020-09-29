@@ -36,6 +36,7 @@ function hook(
       });
     } else {
       compilation.hooks.optimizeChunkAssets
+        // @ts-ignore
         .tapPromise(PLUGIN_NAME, (chunks: compilation.Chunk[]) => {
           const files: string[] = [];
           for (const chunk of chunks) {

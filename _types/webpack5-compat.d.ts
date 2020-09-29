@@ -2,7 +2,7 @@ import 'webpack';
 import 'webpack-sources';
 import {
   Compilation as CompilationWp5, Compiler,
-  Module as ModuleWp5,
+  Module as ModuleWp5, Chunk as ChunkWp5
 } from 'webpack';
 
 type loaderCallback = (err: Error | undefined | null, content?: string | Buffer, sourceMap?: RawSourceMap) => void;
@@ -244,7 +244,7 @@ declare module 'webpack' {
   namespace compilation {
     class Compilation extends CompilationWp5 {}
     class Module extends ModuleWp5 {}
-    type Chunk = any;
+    class Chunk extends ChunkWp5 {}
   }
   namespace Stats {
     interface ToJsonOutput {
