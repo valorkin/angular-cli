@@ -7,7 +7,7 @@
  */
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
 import { getSystemPath, json, normalize, resolve } from '@angular-devkit/core';
-import { Observable, from, of } from 'rxjs';
+import { Observable, from, isObservable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import * as webpack from 'webpack';
 import { EmittedFiles, getEmittedFiles } from '../utils';
@@ -19,8 +19,7 @@ export interface WebpackLoggingCallback {
   (stats: webpack.Stats, config: webpack.Configuration): void;
 }
 export interface WebpackFactory {
-  (config: webpack.Configuration, handler: webpack.Compiler.Handler): webpack.Compiler.Watching | webpack.Compiler;
-  (config?: webpack.Configuration): webpack.Compiler;
+  (config: webpack.Configuration): Observable<webpack.Compiler> | webpack.Compiler;
 }
 
 export type BuildResult = BuilderOutput & {
@@ -36,46 +35,54 @@ export function runWebpack(
     webpackFactory?: WebpackFactory,
   } = {},
 ): Observable<BuildResult> {
+  const createWebpack = (c: webpack.Configuration) => {
+    if (options.webpackFactory) {
+      const result = options.webpackFactory(c);
+      if (isObservable(result)) {
+        return result;
+      } else {
+        return of(result);
+      }
+    } else {
+      return of(webpack(c));
+    }
+  };
   const log: WebpackLoggingCallback = options.logging
     || ((stats, config) => context.logger.info(stats.toString(config.stats)));
 
-  // return createWebpack(config).pipe(
-  return of(config).pipe(
-    switchMap((config: webpack.Configuration) => new Observable<BuildResult>(obs => {
+  return createWebpack({ ...config, watch: false }).pipe(
+    switchMap(webpackCompiler => new Observable<BuildResult>(obs => {
+      const callback = (err?: Error, stats?: webpack.Stats) => {
+        if (err) {
+          return obs.error(err);
+        }
+
+        if (!stats) {
+          return;
+        }
+
+        // Log stats.
+        log(stats, config);
+
+        obs.next({
+          success: !stats.hasErrors(),
+          webpackStats: stats.toJson(),
+          emittedFiles: getEmittedFiles(stats.compilation),
+        } as unknown as BuildResult);
+
+        if (!config.watch) {
+          obs.complete();
+        }
+      };
+
       try {
-        const callback = (err?: Error, stats?: webpack.Stats) => {
-          if (err) {
-            return obs.error(err);
-          }
-
-          if (!stats) {
-            return;
-          }
-
-          // Log stats.
-          log(stats, config);
-
-          obs.next({
-            success: !stats.hasErrors(),
-            webpackStats: stats.toJson(),
-            emittedFiles: getEmittedFiles(stats.compilation),
-          } as unknown as BuildResult);
-
-          if (!config.watch) {
-            obs.complete();
-          }
-        };
         if (config.watch) {
-          const webpackWatcher = options.webpackFactory
-            ? options.webpackFactory(config, callback)
-            : webpack(config, callback);
+          const watchOptions = config.watchOptions || {};
+          const watching = webpackCompiler.watch(watchOptions, callback);
 
           // Teardown logic. Close the watcher when unsubscribed from.
-          return () => (webpackWatcher as webpack.Compiler.Watching).close(() => {});
+          return () => watching.close(() => { });
         } else {
-          const webpackCompiler = options.webpackFactory
-            ? options.webpackFactory(config)
-            : webpack(config);
           webpackCompiler.run(callback);
         }
       } catch (err) {

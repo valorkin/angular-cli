@@ -70,7 +70,7 @@
     "terser-webpack-plugin": "4.2.2",
     "text-table": "0.2.0",
     "tree-kill": "1.2.2",
-    "webpack": "5.0.0-rc.1",
+    "webpack": "5.0.0-rc.3",
     "webpack-dev-middleware": "3.7.2",
     "webpack-dev-server": "3.11.0",
     "webpack-merge": "5.1.4",

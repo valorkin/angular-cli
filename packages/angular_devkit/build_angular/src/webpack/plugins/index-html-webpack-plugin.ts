@@ -113,8 +113,6 @@ export class IndexHtmlWebpackPlugin {
       }
 
       // Add to compilation assets
-      //TODO_WEBPACK_5 webpack-sources@2 has buffers() property, but @types\webpack-sources has to be updated
-      //@ts-ignore
       compilation.assets[this._options.output] = new RawSource(indexSource);
     });
   }
