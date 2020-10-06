@@ -16,6 +16,7 @@ const CommonJsRequireDependency = require('webpack/lib/dependencies/CommonJsRequ
 const AMDDefineDependency = require('webpack/lib/dependencies/AMDDefineDependency');
 
 // The below is extended because there are not in the typings
+// @ts-ignore
 interface WebpackModule extends compilation.Module {
   name?: string;
   rawRequest?: string;

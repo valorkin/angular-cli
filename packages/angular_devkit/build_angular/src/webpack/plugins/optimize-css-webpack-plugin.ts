@@ -36,6 +36,7 @@ function hook(
       });
     } else {
       compilation.hooks.optimizeChunkAssets
+        // @ts-ignore
         .tapPromise(PLUGIN_NAME, (chunks: compilation.Chunk[]) => {
           const files: string[] = [];
           for (const chunk of chunks) {
@@ -136,6 +137,7 @@ export class OptimizeCssWebpackPlugin {
             newSource = new RawSource(output.css);
           }
 
+          // @ts-ignore
           compilation.assets[file] = newSource;
         });
 
