@@ -12,10 +12,8 @@ import {
   schema,
   strings,
   tags,
-  virtualFs,
   workspaces,
 } from '@angular-devkit/core';
-import { NodeJsSyncHost } from '@angular-devkit/core/node';
 import {
   DryRunEvent,
   UnsuccessfulWorkflowExecution,
@@ -28,7 +26,6 @@ import {
   FileSystemSchematic,
   FileSystemSchematicDescription,
   NodeWorkflow,
-  validateOptionsWithSchema,
 } from '@angular-devkit/schematics/tools';
 import * as inquirer from 'inquirer';
 import * as systemPath from 'path';
@@ -74,8 +71,6 @@ export abstract class SchematicCommand<
   T extends BaseSchematicSchema & BaseCommandOptions
 > extends Command<T> {
   readonly allowPrivateSchematics: boolean = false;
-  private _host = new NodeJsSyncHost();
-  private _workspace: workspaces.WorkspaceDefinition | undefined;
   protected _workflow!: NodeWorkflow;
 
   protected defaultCollectionName = '@schematics/angular';
@@ -87,7 +82,6 @@ export abstract class SchematicCommand<
   }
 
   public async initialize(options: T & Arguments) {
-    await this._loadWorkspace();
     await this.createWorkflow(options);
 
     if (this.schematicName) {
@@ -245,23 +239,23 @@ export abstract class SchematicCommand<
     }
 
     const { force, dryRun } = options;
-    const fsHost = new virtualFs.ScopedHost(new NodeJsSyncHost(), normalize(this.workspace.root));
-
-    const workflow = new NodeWorkflow(fsHost, {
+    const root = this.context.root;
+    const workflow = new NodeWorkflow(root, {
       force,
       dryRun,
-      packageManager: await getPackageManager(this.workspace.root),
+      packageManager: await getPackageManager(root),
       packageRegistry: options.packageRegistry,
-      root: normalize(this.workspace.root),
+      // A schema registry is required to allow customizing addUndefinedDefaults
       registry: new schema.CoreSchemaRegistry(formats.standardFormats),
-      resolvePaths: !!this.workspace.configFile
+      resolvePaths: !!this.workspace
         // Workspace
         ? this.collectionName === this.defaultCollectionName
           // Favor __dirname for @schematics/angular to use the build-in version
-          ? [__dirname, process.cwd(), this.workspace.root]
-          : [process.cwd(), this.workspace.root, __dirname]
+          ? [__dirname, process.cwd(), root]
+          : [process.cwd(), root, __dirname]
         // Global
         : [__dirname, process.cwd()],
+      schemaValidation: true,
     });
     workflow.engineHost.registerContextTransform(context => {
       // This is run by ALL schematics, so if someone uses `externalSchematics(...)` which
@@ -278,8 +272,8 @@ export abstract class SchematicCommand<
     });
 
     const getProjectName = () => {
-      if (this._workspace) {
-        const projectNames = getProjectsByPath(this._workspace, process.cwd(), this.workspace.root);
+      if (this.workspace) {
+        const projectNames = getProjectsByPath(this.workspace, process.cwd(), this.workspace.basePath);
 
         if (projectNames.length === 1) {
           return projectNames[0];
@@ -292,7 +286,7 @@ export abstract class SchematicCommand<
             `);
           }
 
-          const defaultProjectName = this._workspace.extensions['defaultProject'];
+          const defaultProjectName = this.workspace.extensions['defaultProject'];
           if (typeof defaultProjectName === 'string' && defaultProjectName) {
             return defaultProjectName;
           }
@@ -316,8 +310,6 @@ export abstract class SchematicCommand<
     } else {
       workflow.registry.addPostTransform(schema.transforms.addUndefinedDefaults);
     }
-
-    workflow.engineHost.registerOptionsTransform(validateOptionsWithSchema(workflow.registry));
 
     workflow.registry.addSmartDefaultProvider('projectName', getProjectName);
     workflow.registry.useXDeprecatedProvider(msg => this.logger.warn(msg));
@@ -406,7 +398,7 @@ export abstract class SchematicCommand<
 
     const workflow = this._workflow;
 
-    const workingDir = normalize(systemPath.relative(this.workspace.root, process.cwd()));
+    const workingDir = normalize(systemPath.relative(this.context.root, process.cwd()));
 
     // Get the option object from the schematic schema.
     const schematic = this.getSchematic(
@@ -442,7 +434,7 @@ export abstract class SchematicCommand<
 
         if (positions.length > 0) {
           const warning = tags.oneLine`
-            WARNING: This command may not execute successfully.
+            Warning: This command may not execute successfully.
             The package/collection may not support the 'targets' field within '${configPath}'.
             This can be corrected by renaming the following 'targets' fields to 'architect':
           `;
@@ -581,25 +573,6 @@ export abstract class SchematicCommand<
     options: Option[] | null,
   ): Promise<Arguments> {
     return parseArguments(schematicOptions, options, this.logger);
-  }
-
-  private async _loadWorkspace() {
-    if (this._workspace) {
-      return;
-    }
-
-    try {
-      const { workspace } = await workspaces.readWorkspace(
-        this.workspace.root,
-        workspaces.createWorkspaceHost(this._host),
-      );
-      this._workspace = workspace;
-    } catch (err) {
-      if (!this.allowMissingWorkspace) {
-        // Ignore missing workspace
-        throw err;
-      }
-    }
   }
 }
 

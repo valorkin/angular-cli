@@ -5,10 +5,8 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { normalize, virtualFs } from '@angular-devkit/core';
-import { NodeJsSyncHost } from '@angular-devkit/core/node';
 import { UnsuccessfulWorkflowExecution } from '@angular-devkit/schematics';
-import { NodeWorkflow, validateOptionsWithSchema } from '@angular-devkit/schematics/tools';
+import { NodeWorkflow } from '@angular-devkit/schematics/tools';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -64,19 +62,16 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
   private packageManager = PackageManager.Npm;
 
   async initialize() {
-    this.packageManager = await getPackageManager(this.workspace.root);
+    this.packageManager = await getPackageManager(this.context.root);
     this.workflow = new NodeWorkflow(
-      new virtualFs.ScopedHost(new NodeJsSyncHost(), normalize(this.workspace.root)),
+      this.context.root,
       {
         packageManager: this.packageManager,
-        root: normalize(this.workspace.root),
         // __dirname -> favor @schematics/update from this package
         // Otherwise, use packages from the active workspace (migrations)
-        resolvePaths: [__dirname, this.workspace.root],
+        resolvePaths: [__dirname, this.context.root],
+        schemaValidation: true,
       },
-    );
-    this.workflow.engineHost.registerOptionsTransform(
-      validateOptionsWithSchema(this.workflow.registry),
     );
   }
 
@@ -253,7 +248,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
       if (commit) {
         const commitPrefix = `${packageName} migration - ${migration.name}`;
         const commitMessage = migration.description
-          ? `${commitPrefix}\n${migration.description}`
+          ? `${commitPrefix}\n\n${migration.description}`
           : commitPrefix;
         const committed = this.commit(commitMessage);
         if (!committed) {
@@ -274,7 +269,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
     // This works around issues with packages containing migrations that cannot directly depend on the package
     // This check can be removed once the schematic runtime handles this situation
     try {
-      require.resolve('@angular-devkit/schematics', { paths: [this.workspace.root] });
+      require.resolve('@angular-devkit/schematics', { paths: [this.context.root] });
     } catch (e) {
       if (e.code === 'MODULE_NOT_FOUND') {
         this.logger.fatal(
@@ -305,6 +300,20 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         this.packageManager,
         process.argv.slice(2),
       );
+    }
+
+    if (options.all) {
+      const updateCmd = this.packageManager === PackageManager.Yarn
+        ? `'yarn upgrade-interactive' or 'yarn upgrade'`
+        : `'${this.packageManager} update'`;
+
+      this.logger.warn(`
+        '--all' functionality has been removed as updating multiple packages at once is not recommended.
+        To update packages which don’t provide 'ng update' capabilities in your workspace 'package.json' use ${updateCmd} instead.
+        Run the package manager update command after updating packages which provide 'ng update' capabilities.
+      `);
+
+      return 0;
     }
 
     const packages: PackageIdentifier[] = [];
@@ -342,15 +351,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
       }
     }
 
-    if (options.all && packages.length > 0) {
-      this.logger.error('Cannot specify packages when using the "all" option.');
-
-      return 1;
-    } else if (options.all && options.migrateOnly) {
-      this.logger.error('Cannot use "all" option with "migrate-only" option.');
-
-      return 1;
-    } else if (!options.migrateOnly && (options.from || options.to)) {
+    if (!options.migrateOnly && (options.from || options.to)) {
       this.logger.error('Can only use "from" or "to" options with "migrate-only" option.');
 
       return 1;
@@ -358,8 +359,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
 
     // If not asking for status then check for a clean git repository.
     // This allows the user to easily reset any changes from the update.
-    const statusCheck = packages.length === 0 && !options.all;
-    if (!statusCheck && !this.checkCleanGit()) {
+    if (packages.length && !this.checkCleanGit()) {
       if (options.allowDirty) {
         this.logger.warn(
           'Repository is not clean. Update changes will be mixed with pre-existing changes.',
@@ -379,11 +379,10 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
     if (
       options.migrateOnly === undefined &&
       options.from === undefined &&
-      !options.all &&
       packages.length === 1 &&
       packages[0].name === '@angular/cli' &&
-      this.workspace.configFile &&
-      oldConfigFileNames.includes(this.workspace.configFile)
+      this.workspace &&
+      oldConfigFileNames.includes(path.basename(this.workspace.filePath))
     ) {
       options.migrateOnly = true;
       options.from = '1.0.0';
@@ -391,29 +390,18 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
 
     this.logger.info('Collecting installed dependencies...');
 
-    const rootDependencies = await getProjectDependencies(this.workspace.root);
+    const rootDependencies = await getProjectDependencies(this.context.root);
 
     this.logger.info(`Found ${rootDependencies.size} dependencies.`);
 
-    if (options.all) {
-      // 'all' option and a zero length packages have already been checked.
-      // Add all direct dependencies to be updated
-      for (const dep of rootDependencies.keys()) {
-        const packageIdentifier = npa(dep);
-        if (options.next) {
-          packageIdentifier.fetchSpec = 'next';
-        }
-
-        packages.push(packageIdentifier);
-      }
-    } else if (packages.length === 0) {
+    if (packages.length === 0) {
       // Show status
       const { success } = await this.executeSchematic('@schematics/update', 'update', {
         force: options.force || false,
         next: options.next || false,
         verbose: options.verbose || false,
         packageManager: this.packageManager,
-        packages: options.all ? rootDependencies.keys() : [],
+        packages: [],
       });
 
       return success ? 0 : 1;
@@ -448,7 +436,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         // Allow running migrations on transitively installed dependencies
         // There can technically be nested multiple versions
         // TODO: If multiple, this should find all versions and ask which one to use
-        const packageJson = findPackageJson(this.workspace.root, packageName);
+        const packageJson = findPackageJson(this.context.root, packageName);
         if (packageJson) {
           packagePath = path.dirname(packageJson);
           packageNode = await readPackageJson(packagePath);
@@ -686,7 +674,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
           migration.package,
           // Resolve the collection from the workspace root, as otherwise it will be resolved from the temp
           // installed CLI version.
-          require.resolve(migration.collection, { paths: [this.workspace.root] }),
+          require.resolve(migration.collection, { paths: [this.context.root] }),
           new semver.Range('>' + migration.from + ' <=' + migration.to),
           options.createCommits,
         );
@@ -761,7 +749,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
       // Only files inside the workspace root are relevant
       for (const entry of result.split('\n')) {
         const relativeEntry = path.relative(
-          path.resolve(this.workspace.root),
+          path.resolve(this.context.root),
           path.resolve(topLevel.trim(), entry.slice(3).trim()),
         );
 

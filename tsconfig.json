@@ -64,6 +64,7 @@
     "tests/**/*",
     "tools/**/*",
     "benchmark/**/*",
-    "integration/**/*"
+    "integration/**/*",
+    ".ng-dev/**/*"
   ]
 }
